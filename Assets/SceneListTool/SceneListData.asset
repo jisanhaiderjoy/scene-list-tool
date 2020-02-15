@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 0}
+  m_Name: SceneListData
+  m_EditorClassIdentifier: Assembly-CSharp-Editor:SceneListTool:SceneListData
+  FavoriteScenes:
+  - Assets/Scenes/SampleScene.unity
+  - Assets/Scenes/SampleScene 5.unity
+  - Assets/Scenes/SampleScene 2.unity
+  - Assets/Scenes/SampleScene2SampleScene2SampleScene2SampleScene2SampleScene2SampleScene2.unity
+  BuildScenes:
+  - {fileID: 102900000, guid: 9fc0d4010bbf28b4594072e72b8655ab, type: 3}
+  - {fileID: 102900000, guid: f6761e8b1d7c94d9e9622b843054d005, type: 3}
+  - {fileID: 102900000, guid: 0c8dbdf79ecbc4b11a2c280bc198a586, type: 3}
