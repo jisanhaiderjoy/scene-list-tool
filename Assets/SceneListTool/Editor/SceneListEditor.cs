@@ -6,11 +6,6 @@ using UnityEngine;
 using UnityEditorInternal;
 
 namespace SceneListTool {
-    public class SceneListData : ScriptableObject {
-        public List<string> FavoriteScenes;
-        public List<SceneAsset> BuildScenes;
-    }
-
     public class SceneListEditor : EditorWindow {
         #region TEMPLATE_VARIABLES
         private GUIStyle ToolNameStyle;
@@ -22,8 +17,8 @@ namespace SceneListTool {
         private Rect AuthorRect;
         private Rect VersionRect;
 
-        private Color editorSkinColor = new Color(0.6901961f, 0.6980392f, 0.7098039f, 1f);
-        private Color editorSkinBGColor = new Color(0.224f, 0.243f, 0.275f, 0.6f);
+        private Color editorSkinColor = new Color(0.690f, 0.698f, 0.710f, 1f);
+        private Color editorSkinBGColor = new Color(0.439f, 0.451f, 0.471f, 1f);
 
         private GUIContent authorInfo = new GUIContent("Author - Jisan Haider Joy", "Find me at,\nhttps://www.facebook.com/jisanhaiderjoy");
         private GUIContent toolTitle = new GUIContent("Scene List", "Title ToolTip");
@@ -40,7 +35,7 @@ namespace SceneListTool {
         #endregion
 
         #region ALLSCENE_VARIABLES
-        GUIContent RefreshButton = new GUIContent("Refresh List", "");
+        GUIContent RefreshButton = new GUIContent("Refresh List", "Refresh the list, incase any scene can't be found in the list");
         GUIContent[] sceneNames;
         GUIContent[] scenePaths;
 
@@ -50,22 +45,23 @@ namespace SceneListTool {
 
         //SceneName Properties
         private GUIStyle sceneNameStyle;
-        Rect[] SceneNameRects;
 
         //Scene Path Properties
         private GUIStyle scenePathStyle;
-        Rect[] ScenePathRects;
-        Rect LastFrameRectLastIndex;
 
         //Scroll View Properties
         private Vector2 scrollPos;
-        Rect[] HorizontalRects;
         #endregion
 
         #region GLOBAL_VARIABLES
         private SceneListData SavedData;
-        private string projectPath;
+
         private Rect windowPosition;
+
+        private string projectPath;
+
+        private GUIStyle ScrollElementBackground;
+        private Texture2D ScrollElementBGTexture;
         #endregion
 
         #region BUTTON_GROUP_GUICONTENT
@@ -78,6 +74,7 @@ namespace SceneListTool {
 
         #region BUILD_SETTINGS
         private ReorderableList reorderableList;
+        private bool ReorderableListChanged = false;
         #endregion
 
         #region UNITY_CALLBACKS
@@ -99,6 +96,13 @@ namespace SceneListTool {
             //Cache the Window Size
             windowPosition = position;
 
+            //Checks If ProSkin
+            //Adjusts the color of Tool based on the Editor Skin
+            if (EditorGUIUtility.isProSkin) {
+                editorSkinColor = new Color(0.1764706f, 0.1764706f, 0.1764706f, 1f);
+                editorSkinBGColor = new Color(0.2196078f, 0.2196078f, 0.2196078f, 1f);
+            }
+
             //Init Template Design Variables
             TemplateInit();
 
@@ -107,23 +111,11 @@ namespace SceneListTool {
             topToolbarNames[1].image = (Texture)EditorGUIUtility.Load("Favorite Icon");
             topToolbarNames[2].image = (Texture)EditorGUIUtility.Load("CustomSorting");
 
-            //Load Title Scene Asset Icon
-            toolTitle.image = (Texture)EditorGUIUtility.Load("SceneAsset Icon");
-
             //Load Refresh Button Icon
             RefreshButton.image = (Texture)EditorGUIUtility.Load("RotateTool");
 
             //Load Button Asset Icon
             AddToBuild.image = (Texture)EditorGUIUtility.Load("UnityEditor.SceneHierarchyWindow");
-
-            if (starStyle == null)
-                InitStarToggleIcon();
-
-            if (sceneNameStyle == null)
-                InitSceneNameStyle();
-
-            if (scenePathStyle == null)
-                InitScenePathStyle();
 
             //Gets the Project Path
             projectPath = Application.dataPath;
@@ -136,12 +128,17 @@ namespace SceneListTool {
                 SavedData = CreateInstance<SceneListData>();
                 AssetDatabase.CreateAsset(SavedData, "Assets/SceneListTool/SceneListData.asset");
 
+                //No Starred Scene. Empty List
                 SavedData.FavoriteScenes = new List<string>();
-
+                //No Build Scene List. Empty List
                 SavedData.BuildScenes = new List<SceneAsset>();
+                //As Empty BuildScene List, Empty Enabled List
+                SavedData.BuildScenes_Enabled = new List<bool>();
+
                 //Load Build Scenes into List
                 for (int i = 0; i < EditorBuildSettings.scenes.Length; i++) {
                     SavedData.BuildScenes.Add(AssetDatabase.LoadAssetAtPath<SceneAsset>(EditorBuildSettings.scenes[i].path));
+                    SavedData.BuildScenes_Enabled.Add(EditorBuildSettings.scenes[i].enabled);
                 }
 
                 EditorUtility.SetDirty(SavedData);
@@ -149,8 +146,6 @@ namespace SceneListTool {
             }
 
             if (reorderableList == null || reorderableList.list == null) {
-                Debug.Log("Reorder List Created");
-
                 //Setup Reorderable List for the Scene List
                 reorderableList = new ReorderableList(SavedData.BuildScenes, typeof(SceneListData), true, true, true, true);
 
@@ -158,7 +153,8 @@ namespace SceneListTool {
                 reorderableList.drawHeaderCallback = drawHeaderCallback;
                 reorderableList.drawElementCallback = drawElementCallback;
                 reorderableList.onAddCallback = onAddCallback;
-                reorderableList.onChangedCallback = onChangeCallback;
+                reorderableList.onReorderCallbackWithDetails = onReorderCallbackWithDetails;
+                reorderableList.onRemoveCallback = onRemoveCallback;
             }
 
             EditorBuildSettings.sceneListChanged += SceneListChangeCallback;
@@ -169,6 +165,12 @@ namespace SceneListTool {
 
         private void OnDisable() {
             EditorBuildSettings.sceneListChanged -= SceneListChangeCallback;
+        }
+
+        private void OnDestroy() {
+            DestroyImmediate(ScrollElementBGTexture);
+            ScrollElementBackground = null;
+            System.GC.Collect();
         }
 
         /// <summary>
@@ -184,11 +186,29 @@ namespace SceneListTool {
         /// Called by Unity on every frame of GUI
         /// </summary>
         private void OnGUI() {
+            //Styles Initializations
+            #region StylesInitializations
+            if (starStyle == null)
+                InitStarToggleIcon();
+
+            if (ScrollElementBackground == null)
+                InitScrollElementBackground();
+
+            if (sceneNameStyle == null)
+                InitSceneNameStyle();
+
+            if (scenePathStyle == null)
+                InitScenePathStyle();
+
+            if (ToolNameStyle == null)
+                InitToolNameStyle();
+            #endregion
+
             //Cache the Window Size
             windowPosition = position;
 
-            #region TEMPLATE_DESIGN_DRAW
             //If Window Size is changed, Update the Template Size Variables
+            #region TEMPLATE_DESIGN_DRAW
             if (TemplateBackgroundRect.width != windowPosition.width || TemplateBackgroundRect.height != windowPosition.height)
                 TemplateSizeUpdate();
 
@@ -209,57 +229,23 @@ namespace SceneListTool {
             //ToolBar X Pos Spacing
             GUILayout.Space(25);
             //ToolBar GUI Create
-            int _tempToolBarSelection = GUILayout.Toolbar(topToolbarSelection, topToolbarNames, GUILayout.Width(windowPosition.width - 50f), GUILayout.Height(30));
+            topToolbarSelection = GUILayout.Toolbar(topToolbarSelection, topToolbarNames, GUILayout.Width(windowPosition.width - 50f), GUILayout.Height(30));
             //ToolBar X Pos Spacing
             GUILayout.Space(25);
             EditorGUILayout.EndHorizontal();
             #endregion
 
-            #region BODY_DRAW
-
-
             //Based on the Toolbar Selection, UI is Drawn
-            if (_tempToolBarSelection == 0) {
+            #region BODY_DRAW
+            if (topToolbarSelection == 0) {
                 //Draws the "All Scenes" List.
                 DrawAllScene();
-
-                //Repaints the GUI. Avoids Drawing Lag
-                //Checks if Repaint is Required. This is simple Optimization Step to Avoid Unnecessary Repaints
-                if (LastFrameRectLastIndex.y != ScenePathRects[ScenePathRects.Length - 1].y) {
-                    //Repaints the GUI. Avoids Drawing Lag
-                    Repaint();
-
-                    //Stores the LastFrameRect of the element of the ScenePathRect Array
-                    LastFrameRectLastIndex = ScenePathRects[ScenePathRects.Length - 1];
-                }
-
-            } else if (_tempToolBarSelection == 1) {
+            } else if (topToolbarSelection == 1) {
                 //Draws the "Starred Scene" List.
                 DrawStarredScene();
-
-                //Repaints the GUI. Avoids Drawing Lag
-                //Checks if Repaint is Required. This is simple Optimization Step to Avoid Unnecessary Repaints
-                if (LastFrameRectLastIndex.y != ScenePathRects[SavedData.FavoriteScenes.Count - 1].y) {
-                    //Repaints the GUI. Avoids Drawing Lag
-                    Repaint();
-
-                    //Stores the LastFrameRect of the element of the ScenePathRect Array
-                    LastFrameRectLastIndex = ScenePathRects[SavedData.FavoriteScenes.Count - 1];
-                }
-            } else if (_tempToolBarSelection == 2) {
+            } else if (topToolbarSelection == 2) {
                 //Draws The "Build List"
                 DrawBuildList();
-            }
-
-            //Update Toolbar Selection
-            if (_tempToolBarSelection != topToolbarSelection) {
-                topToolbarSelection = _tempToolBarSelection;
-
-                //A garbage value given to initiate Repaint on next frame
-                LastFrameRectLastIndex.y = -100;
-
-                //GUI repainted
-                Repaint();
             }
             #endregion
         }
@@ -287,19 +273,20 @@ namespace SceneListTool {
                 for (int i = 0; i < sceneNames.Length; i++) {
                     //The main Horizontal Area of Each Elements. It's Rect Component is stored to calculate the Center.
                     //Helps for making the Editor Responsive
-                    var _tempRectHorizontal = EditorGUILayout.BeginHorizontal("Box", GUILayout.MinHeight(46));
+                    EditorGUILayout.BeginHorizontal(ScrollElementBackground, GUILayout.MinHeight(70f));
                     {
-                        //Only when the Window is repainted, the Temp Rect Value will be stored for that Element.
-                        //Otherwise, Gives wrong value
-                        if (Event.current.type == EventType.Repaint) {
-                            HorizontalRects[i] = _tempRectHorizontal;
-                        }
+                        //The Width of the Text is defined as per the Window Width
+                        float _TextWidth = windowPosition.width - 180f;
 
-                        //Scene Element Background
-                        EditorGUI.DrawRect(HorizontalRects[i], editorSkinColor);
+                        EditorGUILayout.BeginVertical();
+                        var _b4 = sceneNameStyle.CalcHeight(sceneNames[i], _TextWidth);
+                        var _b5 = scenePathStyle.CalcHeight(scenePaths[i], _TextWidth);
+
+                        float h2 = _b4 + _b5;
+                        EditorGUILayout.EndVertical();
 
                         //Center windowPosition for each element
-                        float _horizontalCenter = HorizontalRects[i].height / 2f;
+                        float _horizontalCenter = 60f > h2 ? (60f / 2f) : (h2 / 2f);
 
                         //Creates a small space before drawing the StarToggle
                         GUILayout.Space(3);
@@ -309,7 +296,7 @@ namespace SceneListTool {
                         EditorGUILayout.BeginVertical();
                         {
                             //Spacing added to Keep the Toggle at Center
-                            GUILayout.Space(_horizontalCenter - 17.5f);
+                            GUILayout.Space(_horizontalCenter - 12.5f);
 
                             //Toggle Create with size 25x25
                             //TempBool taken to get the Updated Value
@@ -337,44 +324,17 @@ namespace SceneListTool {
                         GUILayout.Space(3);
                         //Text Design
                         #region TEXT_LABELS_DESIGN
-                        //The Width of the Text is defined as per the Window Width
-                        float _TextWidth = windowPosition.width - 180f;
                         //Vertical Area Created To Draw Two Labels on top of each other
                         EditorGUILayout.BeginVertical();
                         {
                             //Spacing added to keep the Text Labels at Center of Background
-                            GUILayout.Space(_horizontalCenter - 4f);
-                            GUILayout.Space(-(SceneNameRects[i].height / 2f + ScenePathRects[i].height / 2f));
+                            GUILayout.Space(_horizontalCenter - h2 / 2f);
 
-                            //Rect Create. A Space is reserved calculating the Name Length and Available Space.
-                            //This is done to make the label Responsive.
-                            var _tempRect = GUILayoutUtility.GetRect(sceneNames[i], sceneNameStyle, GUILayout.Width(_TextWidth));
-                            var _tempRect2 = GUILayoutUtility.GetRect(scenePaths[i], scenePathStyle, GUILayout.Width(_TextWidth));
+                            //Scene Name Label
+                            EditorGUILayout.LabelField(sceneNames[i], sceneNameStyle, GUILayout.Width(_TextWidth));
 
-                            //The Temp value is stored only when the Editor is Repainted. Otherwise gives wrong value
-                            if (Event.current.type == EventType.Repaint) {
-                                SceneNameRects[i] = _tempRect;
-                                ScenePathRects[i] = _tempRect2;
-                            }
-
-                            //Scene Name Area Created, and Label Drawn
-                            GUILayout.BeginArea(SceneNameRects[i]);
-                            {
-                                //Scene Name Label
-                                EditorGUILayout.LabelField(sceneNames[i], sceneNameStyle, GUILayout.Width(_TextWidth));
-                            }
-                            GUILayout.EndArea();
-
-                            //Scene Path Area Created, and Label Drawn
-                            GUILayout.BeginArea(ScenePathRects[i]);
-                            {
-                                //Scene Path Label
-                                EditorGUILayout.LabelField(scenePaths[i], scenePathStyle, GUILayout.Width(_TextWidth));
-                            }
-                            GUILayout.EndArea();
-
-                            //Some Extra Space added below
-                            GUILayout.Space(8f);
+                            //Scene Path Label
+                            EditorGUILayout.LabelField(scenePaths[i], scenePathStyle, GUILayout.Width(_TextWidth));
                         }
                         EditorGUILayout.EndVertical();
                         #endregion
@@ -398,84 +358,49 @@ namespace SceneListTool {
             //Creates a ScrollView
             scrollPos = EditorGUILayout.BeginScrollView(scrollPos, false, false, GUILayout.Height(windowPosition.height - 104 - 37));
             {
-                //the ith Rects are Reused, so that Tab Changes will not require more repaints.
-                //only jth StarToggles, Scene Name, Path and Buttons are used
-                int i = 0;
                 //Loops through the StarToggles that are true. Which is, the scenes that are starred
-                for (int j = 0; j < starToggles.Length; j++) {
+                for (int i = 0; i < starToggles.Length; i++) {
                     //If Not Starred, Skip
-                    if (!starToggles[j])
+                    if (!starToggles[i])
                         continue;
 
-                    //The main Horizontal Area of Each Elements. It's Rect Component is stored to calculate the Center.
-                    //Helps for making the Editor Responsive
-                    var _tempRectHorizontal = EditorGUILayout.BeginHorizontal("Box", GUILayout.MinHeight(46));
+                    //The main Horizontal Area of Each Elements.
+                    EditorGUILayout.BeginHorizontal(ScrollElementBackground, GUILayout.MinHeight(70f));
                     {
-                        //Only when the Window is repainted, the Temp Rect Value will be stored for that Element.
-                        //Otherwise, Gives wrong value
-                        if (Event.current.type == EventType.Repaint) {
-                            HorizontalRects[i] = _tempRectHorizontal;
-                        }
-
-                        //Scene Element Background
-                        EditorGUI.DrawRect(HorizontalRects[i], editorSkinColor);
-
-                        //Center windowPosition for each element
-                        float _horizontalCenter = HorizontalRects[i].height / 2f;
-
                         //Creates a small space before drawing the Text Labels
                         GUILayout.Space(3);
 
                         //Text Design
-                        #region TEXT_LABEL_DESIGN
+                        #region TEXT_LABELS_DESIGN
                         //The Width of the Text is defined as per the Window Width
                         float _TextWidth = windowPosition.width - 146f;
+
                         //Vertical Area Created To Draw Two Labels on top of each other
                         EditorGUILayout.BeginVertical();
-                        {
-                            //Spacing added to keep the Text Labels at Center of Background
-                            GUILayout.Space(_horizontalCenter - 4f);
-                            GUILayout.Space(-(SceneNameRects[i].height / 2f + ScenePathRects[i].height / 2f));
 
-                            //Rect Create. A Space is reserved calculating the Name Length and Available Space.
-                            //This is done to make the label Responsive.
-                            var _tempRect = GUILayoutUtility.GetRect(sceneNames[j], sceneNameStyle, GUILayout.Width(_TextWidth));
-                            var _tempRect2 = GUILayoutUtility.GetRect(scenePaths[j], scenePathStyle, GUILayout.Width(_TextWidth));
+                        float _b4 = sceneNameStyle.CalcHeight(sceneNames[i], _TextWidth);
+                        float _b5 = scenePathStyle.CalcHeight(scenePaths[i], _TextWidth);
 
-                            //The Temp value is stored only when the Editor is Repainted. Otherwise gives wrong value
-                            if (Event.current.type == EventType.Repaint) {
-                                SceneNameRects[i] = _tempRect;
-                                ScenePathRects[i] = _tempRect2;
-                            }
+                        float h2 = _b4 + _b5;
+                        //Center windowPosition for each element
+                        float _horizontalCenter = 60f > h2 ? (60f / 2f) : (h2 / 2f);
 
-                            //Scene Name Area Created, and Label Drawn
-                            GUILayout.BeginArea(SceneNameRects[i]);
-                            {
-                                //Scene Name Label
-                                EditorGUILayout.LabelField(sceneNames[j], sceneNameStyle, GUILayout.Width(_TextWidth));
-                            }
-                            GUILayout.EndArea();
+                        //Spacing added to keep the Text Labels at Center of Background
+                        GUILayout.Space(_horizontalCenter - h2 / 2f);
 
-                            //Scene Path Area Created, and Label Drawn
-                            GUILayout.BeginArea(ScenePathRects[i]);
-                            {
-                                //Scene Path Label
-                                EditorGUILayout.LabelField(scenePaths[j], scenePathStyle, GUILayout.Width(_TextWidth));
-                            }
-                            GUILayout.EndArea();
+                        //Scene Name Label
+                        EditorGUILayout.LabelField(sceneNames[i], sceneNameStyle, GUILayout.Width(_TextWidth));
 
-                            //Some Extra Space added below
-                            GUILayout.Space(8f);
-                        }
+                        //Scene Path Label
+                        EditorGUILayout.LabelField(scenePaths[i], scenePathStyle, GUILayout.Width(_TextWidth));
+
                         EditorGUILayout.EndVertical();
                         #endregion
 
                         //Draw Action Buttons
-                        DrawSceneActionButtons(j, _horizontalCenter);
+                        DrawSceneActionButtons(i, _horizontalCenter);
                     }
                     EditorGUILayout.EndHorizontal(); //End EachScene Horizontal Block
-
-                    i++;
                 } //End SceneList Loop
             }
             EditorGUILayout.EndScrollView(); //End ScrollView
@@ -488,16 +413,53 @@ namespace SceneListTool {
             //Creates an Initial Spacing from the Toolbar
             GUILayout.Space(15);
 
-            reorderableList.DoLayoutList();
+            //Creates a ScrollView
+            scrollPos = EditorGUILayout.BeginScrollView(scrollPos, false, false, GUILayout.Height(windowPosition.height - 104 - 37));
+            {
+                reorderableList.DoLayoutList();
 
-            GUILayout.Space(5);
-            if (GUILayout.Button("Apply To Build Settings")) {
-                SetEditorBuildSettingsScenes();
-            }
+                if (GUILayout.Button("Apply To Build Settings")) {
+                    SetEditorBuildSettingsScenes();
+                }
 
-            if (GUILayout.Button("Open Build Settings")) {
-                GetWindow(System.Type.GetType("UnityEditor.BuildPlayerWindow,UnityEditor"), true);
+                if (GUILayout.Button("Open Build Settings")) {
+                    GetWindow(System.Type.GetType("UnityEditor.BuildPlayerWindow,UnityEditor"), true);
+                }
+
+                GUILayout.Space(5);
+
+                EditorGUILayout.LabelField("Handy Shortcut Buttons", EditorStyles.boldLabel == null ? "Label" : EditorStyles.boldLabel);
+
+                EditorGUILayout.BeginHorizontal();
+                {
+                    if (GUILayout.Button("Open Project Settings")) {
+                        EditorApplication.ExecuteMenuItem("Edit/Project Settings...");
+                    }
+
+                    if (GUILayout.Button("Open Lighting Settings")) {
+                        EditorApplication.ExecuteMenuItem("Window/Rendering/Lighting Settings");
+                    }
+                }
+                EditorGUILayout.EndHorizontal();
+
+                if (GUILayout.Button("Reset SceneList Data")) {
+                    if (EditorUtility.DisplayDialog("Reset Scene List Data?", "Are you sure you want to reset all the Data? \nYou can't Undo this action", "Yes", "No")) {
+                        //No Starred Scene. Empty List
+                        SavedData.FavoriteScenes.Clear();
+                        //No Build Scene List. Empty List
+                        SavedData.BuildScenes.Clear();
+                        SavedData.BuildScenes_Enabled.Clear();
+
+                        //Saves into Scriptable Asset
+                        EditorUtility.SetDirty(SavedData);
+                        AssetDatabase.SaveAssets();
+
+                        //Refresh the data for UI
+                        RefreshList();
+                    }
+                }
             }
+            EditorGUILayout.EndScrollView();
         }
         #endregion
 
@@ -518,25 +480,61 @@ namespace SceneListTool {
         /// <param name="isActive"></param>
         /// <param name="isFocused"></param>
         void drawElementCallback(Rect rect, int index, bool isActive, bool isFocused) {
-            Rect _buttonRect = rect;
-            _buttonRect.width = 30f;
+            //ToggleRect
+            Rect _toggleRect = rect;
+            _toggleRect.width = 20f;
 
+            //If Index Element is Null, then Toggle will be disabled
             GUI.enabled = SavedData.BuildScenes[index] != null;
-            GUI.Button(_buttonRect, index.ToString());
-            //GUI.Label(_buttonRect, index.ToString());
+            //If Toggle is Changed
+            var _tempToggle = EditorGUI.Toggle(_toggleRect, SavedData.BuildScenes_Enabled[index]);
+            if (_tempToggle != SavedData.BuildScenes_Enabled[index]) {
+                //ListChange Flagged, to prevent callback from BuildSettings
+                ReorderableListChanged = true;
+                //Data Updated
+                SavedData.BuildScenes_Enabled[index] = _tempToggle;
 
-            Rect _objectRect = rect;
-            _objectRect.width -= 30f;
-            _objectRect.x += 32f;
-            GUI.enabled = true;
-            var _sceneObj = (SceneAsset)EditorGUI.ObjectField(_objectRect, SavedData.BuildScenes[index], typeof(SceneAsset), false);
-
-            if (_sceneObj != SavedData.BuildScenes[index]) {
-                Debug.Log("Scene Field Updated");
-                SavedData.BuildScenes[index] = _sceneObj;
-
+                //Data Saved into the Editor
                 EditorUtility.SetDirty(SavedData);
                 AssetDatabase.SaveAssets();
+                //BuildSettings Updated
+                SetEditorBuildSettingsScenes();
+            }
+
+            //ObjectField Rect Setup
+            Rect _objectRect = rect;
+            _objectRect.width -= 20f;
+            _objectRect.x += 20f;
+            _objectRect.width += 2f;
+
+            //Make Sure Object Field is Enabled
+            GUI.enabled = true;
+            //Object Field Drawn, and Checked for Change
+            var _sceneObj = (SceneAsset)EditorGUI.ObjectField(_objectRect, SavedData.BuildScenes[index], typeof(SceneAsset), false);
+            if (_sceneObj != SavedData.BuildScenes[index]) {
+                Debug.Log("Scene Field Updated");
+                //ListChange Flagged, to prevent callback from BuildSettings
+                ReorderableListChanged = true;
+
+                //If Updated Field is Not Null
+                bool _isNotNull = _sceneObj != null;
+
+                //If Updated Scene is Not Null, checks if the Scene is already available
+                if (_isNotNull) {
+                    if (!SavedData.BuildScenes.Contains(_sceneObj)) {
+                        SavedData.BuildScenes[index] = _sceneObj;
+                        SavedData.BuildScenes_Enabled[index] = _isNotNull;
+                    }
+                } else {
+                    //IF null, List index is set null
+                    SavedData.BuildScenes[index] = null;
+                    SavedData.BuildScenes_Enabled[index] = _isNotNull;
+                }
+
+                //Data Saved into the Editor
+                EditorUtility.SetDirty(SavedData);
+                AssetDatabase.SaveAssets();
+                //BuildSettings Updated
                 SetEditorBuildSettingsScenes();
             }
         }
@@ -548,37 +546,83 @@ namespace SceneListTool {
         void onAddCallback(ReorderableList l) {
             Debug.Log("onAddCallback");
 
+            //Null SceneAsset Added
             SavedData.BuildScenes.Add(null);
+            //By Default, False
+            SavedData.BuildScenes_Enabled.Add(false);
+
+            //ListChange Flagged, to prevent callback from BuildSettings
+            ReorderableListChanged = true;
+            //Data Saved into the Editor
+            EditorUtility.SetDirty(SavedData);
+            AssetDatabase.SaveAssets();
+            //BuildSettings Updated
+            SetEditorBuildSettingsScenes();
         }
 
         /// <summary>
-        /// Callback when the ReorderList has been Updated. Add/Change/Delete
+        /// Callback when the Remove button on ReoderList is pressed.
         /// </summary>
         /// <param name="l"></param>
-        void onChangeCallback(ReorderableList l) {
-            Debug.Log("onChangeCallback");
-            _listChange = true;
+        void onRemoveCallback(ReorderableList l) {
+            Debug.Log("onRemoveCallback");
+
+            //Scene Removed From Data at Selected Index
+            SavedData.BuildScenes.RemoveAt(l.index);
+            SavedData.BuildScenes_Enabled.RemoveAt(l.index);
+
+            //ListChange Flagged, to prevent callback from BuildSettings
+            ReorderableListChanged = true;
+            //Data Saved into the Editor
             EditorUtility.SetDirty(SavedData);
             AssetDatabase.SaveAssets();
+            //BuildSettings Updated
             SetEditorBuildSettingsScenes();
         }
-        private bool _listChange = false;
+
+        /// <summary>
+        /// Callback when the ReorderList has been Reordered
+        /// </summary>
+        /// <param name="l"></param>
+        void onReorderCallbackWithDetails(ReorderableList l, int oldIndex, int newIndex) {
+            Debug.Log("onReorderCallbackWithDetails");
+
+            //Swap Operation, BuildScenes are automatically Updated. Only Enabled States has to be swapped
+            //Store oldIndex Value Into Temp
+            var _tempSceneEnable = SavedData.BuildScenes_Enabled[oldIndex];
+            //Update OldIndex to newIndex
+            SavedData.BuildScenes_Enabled[oldIndex] = SavedData.BuildScenes_Enabled[newIndex];
+            //Update newIndex to OldIndex
+            SavedData.BuildScenes_Enabled[newIndex] = _tempSceneEnable;
+
+            //ListChange Flagged, to prevent callback from BuildSetting
+            ReorderableListChanged = true;
+            //Data Saved into the Editor
+            EditorUtility.SetDirty(SavedData);
+            AssetDatabase.SaveAssets();
+            //BuildSettings Updated
+            SetEditorBuildSettingsScenes();
+        }
+
         /// <summary>
         /// Callback when the Scene List from the EditorBuildSettings has been updated. Add/Change/Delete
         /// </summary>
         private void SceneListChangeCallback() {
-            if (_listChange) {
-                _listChange = false;
+            //If ListChanged, This callback is ignored
+            if (ReorderableListChanged) {
+                ReorderableListChanged = false;
                 return;
             }
 
             Debug.Log("SceneListChangeCallback");
             //Clears Old List
             SavedData.BuildScenes.Clear();
+            SavedData.BuildScenes_Enabled.Clear();
 
             //Load Updated Build Scenes into List
             for (int i = 0; i < EditorBuildSettings.scenes.Length; i++) {
                 SavedData.BuildScenes.Add(AssetDatabase.LoadAssetAtPath<SceneAsset>(EditorBuildSettings.scenes[i].path));
+                SavedData.BuildScenes_Enabled.Add(EditorBuildSettings.scenes[i].enabled);
             }
 
             EditorUtility.SetDirty(SavedData);
@@ -591,10 +635,12 @@ namespace SceneListTool {
         public void SetEditorBuildSettingsScenes() {
             // Find valid Scene paths and make a list of EditorBuildSettingsScene
             List<EditorBuildSettingsScene> editorBuildSettingsScenes = new List<EditorBuildSettingsScene>();
-            foreach (var sceneAsset in SavedData.BuildScenes) {
-                string scenePath = AssetDatabase.GetAssetPath(sceneAsset);
+
+            for (int i = 0; i < SavedData.BuildScenes.Count; i++) {
+                string scenePath = AssetDatabase.GetAssetPath(SavedData.BuildScenes[i]);
+                //Null Scenes are avoided
                 if (!string.IsNullOrEmpty(scenePath))
-                    editorBuildSettingsScenes.Add(new EditorBuildSettingsScene(scenePath, true));
+                    editorBuildSettingsScenes.Add(new EditorBuildSettingsScene(scenePath, SavedData.BuildScenes_Enabled[i]));
             }
 
             // Set the Build Settings window Scene list
@@ -616,7 +662,7 @@ namespace SceneListTool {
             {
                 //Sets the group to the Center from the Background, So that when the Background Height Increases
                 //It will always stay in the Center.
-                GUILayout.Space(bg_center - 32f);
+                GUILayout.Space(bg_center - 27f);
 
                 //Button Group 1 - "Open Button" & "Ping Button"
                 #region BUTTON_GROUP_1
@@ -625,15 +671,18 @@ namespace SceneListTool {
                 {
                     //Open Button
                     if (GUILayout.Button(Open, GUILayout.Width(53f), GUILayout.Height(18))) {
+                        //Save Diaglos box shown for Dirty Scene
                         if (EditorSceneManager.GetActiveScene().isDirty) {
                             EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo();
                         }
 
+                        //Selected Scene Opened
                         EditorSceneManager.OpenScene(scenePaths[i].text, OpenSceneMode.Single);
                     }
 
                     //Ping Button
                     if (GUILayout.Button(Ping, GUILayout.Width(53f), GUILayout.Height(18))) {
+                        //Project Browser Window Showed if not Shown
                         GetWindow(System.Type.GetType("UnityEditor.ProjectBrowser,UnityEditor"));
                         Selection.activeObject = AssetDatabase.LoadMainAssetAtPath(scenePaths[i].text);
                         EditorGUIUtility.PingObject(AssetDatabase.LoadAssetAtPath(scenePaths[i].text, typeof(SceneAsset)));
@@ -650,6 +699,7 @@ namespace SceneListTool {
                 {
                     //Add button
                     if (GUILayout.Button(Add, GUILayout.Width(53f), GUILayout.Height(18))) {
+                        //Save Diaglos box shown for Dirty Scene
                         if (EditorSceneManager.GetActiveScene().isDirty) {
                             EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo();
                         }
@@ -680,6 +730,7 @@ namespace SceneListTool {
                     if (!SavedData.BuildScenes.Contains(_scene)) {
                         //Scene Added to List
                         SavedData.BuildScenes.Add(_scene);
+                        SavedData.BuildScenes_Enabled.Add(true);
 
                         //Data Saved
                         EditorUtility.SetDirty(SavedData);
@@ -708,10 +759,6 @@ namespace SceneListTool {
             scenePaths = new GUIContent[_sceneCount];
 
             starToggles = new bool[_sceneCount];
-            SceneNameRects = new Rect[_sceneCount];
-            ScenePathRects = new Rect[_sceneCount];
-            LastFrameRectLastIndex = new Rect();
-            HorizontalRects = new Rect[_sceneCount];
 
             //Iterates through all the scenes found from the Project
             for (int i = 0; i < _sceneCount; i++) {
@@ -732,14 +779,53 @@ namespace SceneListTool {
         #endregion
 
         #region INITIALIZATION
+        //The Background for Each Scene List Element
+        private void InitScrollElementBackground() {
+            Debug.Log("Init BG Color");
+
+            //Box Template Taken From GUIStyle
+            ScrollElementBackground = new GUIStyle();
+            ScrollElementBackground.border = new RectOffset(6, 6, 6, 6);
+            ScrollElementBackground.margin = new RectOffset(4, 4, 4, 4);
+            ScrollElementBackground.padding = new RectOffset(4, 4, 4, 4);
+
+            //New Texture is Created
+            ScrollElementBGTexture = new Texture2D(64, 64);
+
+            //Pixels are Set as per the Color inside the Array
+            Color[] ColorBlock = ScrollElementBGTexture.GetPixels();
+            for (int i = 0; i < ColorBlock.Length; i++) {
+                ColorBlock[i] = editorSkinColor;
+            }
+
+            //Pixels are Applied into Texture
+            ScrollElementBGTexture.SetPixels(ColorBlock);
+            ScrollElementBGTexture.Apply();
+
+            //Background Texture added into the Background Style
+            ScrollElementBackground.normal.background = ScrollElementBGTexture;
+
+            //Instructs the Editor to Not Consider it as an Asset of the Scene and Also not to UnloadIt.
+            //WARNING:Manual Unloading Required. Done at OnDestroy
+            ScrollElementBGTexture.hideFlags = HideFlags.DontSave;
+        }
+
         //The Star Toggle Icon for "All Scenes" Tab
         private void InitStarToggleIcon() {
             starStyle = new GUIStyle();
 
             //Inactive Star Icon
-            starStyle.normal.background = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SceneListTool/star_inactive.png");
-            starStyle.hover.background = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SceneListTool/star_inactive.png");
-            starStyle.active.background = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SceneListTool/star_inactive.png");
+            //Checks If ProSkin
+            //Adjusts the color of Tool based on the Editor Skin
+            if (EditorGUIUtility.isProSkin) {
+                starStyle.normal.background = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SceneListTool/star_inactive_pro.png");
+                starStyle.hover.background = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SceneListTool/star_inactive_pro.png");
+                starStyle.active.background = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SceneListTool/star_inactive_pro.png");
+            } else {
+                starStyle.normal.background = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SceneListTool/star_inactive.png");
+                starStyle.hover.background = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SceneListTool/star_inactive.png");
+                starStyle.active.background = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SceneListTool/star_inactive.png");
+            }
 
             //Active Star Icon
             starStyle.onNormal.background = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SceneListTool/star_active.png");
@@ -749,20 +835,28 @@ namespace SceneListTool {
 
         //The Scene Name Font Style is Initialized
         private void InitSceneNameStyle() {
-            sceneNameStyle = new GUIStyle {
-                fontSize = 14,
-                fontStyle = FontStyle.Bold,
-                wordWrap = true
-            };
+            if (EditorStyles.boldLabel == null)
+                sceneNameStyle = new GUIStyle("Label");
+            else
+                sceneNameStyle = new GUIStyle(EditorStyles.boldLabel);
+
+            sceneNameStyle.margin = new RectOffset(0, 0, 0, 0);
+            sceneNameStyle.fontSize = 14;
+            sceneNameStyle.fontStyle = FontStyle.Bold;
+            sceneNameStyle.wordWrap = true;
         }
 
         //The Scene Path Font Style is Initialized
         private void InitScenePathStyle() {
-            scenePathStyle = new GUIStyle {
-                fontSize = 10,
-                fontStyle = FontStyle.Normal,
-                wordWrap = true
-            };
+            if (EditorStyles.miniLabel == null)
+                scenePathStyle = new GUIStyle("Label");
+            else
+                scenePathStyle = new GUIStyle(EditorStyles.miniLabel);
+
+            scenePathStyle.margin = new RectOffset(0, 0, 0, 0);
+            scenePathStyle.fontSize = 10;
+            scenePathStyle.fontStyle = FontStyle.Normal;
+            scenePathStyle.wordWrap = true;
         }
         #endregion
 
@@ -770,7 +864,9 @@ namespace SceneListTool {
         //A Signature Template Design, for Jisan Haider Joy
         private void DrawTemplate() {
             //Background Color
-            EditorGUI.DrawRect(TemplateBackgroundRect, editorSkinBGColor);
+            if (!EditorGUIUtility.isProSkin) {
+                EditorGUI.DrawRect(TemplateBackgroundRect, editorSkinBGColor);
+            }
 
             //Top Design
             #region Top Design
@@ -789,31 +885,49 @@ namespace SceneListTool {
             GUI.Label(VersionRect, version);
             #endregion
 
-            //#region ColorSettings
+            #region ColorSettings
             //editorSkinColor = EditorGUI.ColorField(new Rect(170f, windowPosition.height - 22.25f, 60f, 15f), editorSkinColor);
             //editorSkinBGColor = EditorGUI.ColorField(new Rect(240f, windowPosition.height - 22.25f, 60f, 15f), editorSkinBGColor);
-            //#endregion
+            #endregion
         }
 
         /// <summary>
         /// Initializes the Variables Required To Draw The Template Design
         /// </summary>
         private void TemplateInit() {
+            //Main Background Rect
             TemplateBackgroundRect = new Rect(0, 0, windowPosition.width, windowPosition.height);
+
+            //Title Name Background Rect
             TitleBackgroundRect = new Rect(0, 0, windowPosition.width, 40);
+            //Title Name Rect
             ToolTitleNameRect = new Rect(0, (40 / 2f - 10f), windowPosition.width, 20f);
+            //Load Title Scene Asset Icon
+            toolTitle.image = (Texture)EditorGUIUtility.Load("SceneAsset Icon");
+
+            //Bottom Trademark Background Rect
             TradeMarkBackgroundRect = new Rect(0, windowPosition.height - 30f, windowPosition.width, 30f);
+            //Bottom Trademark Author Label Rect
             AuthorRect = new Rect(10, windowPosition.height - 22.25f, 160f, 15f);
+            //Bottom Trademark Version Label Rect
             VersionRect = new Rect(windowPosition.width - 95f, windowPosition.height - 22.25f, windowPosition.width, 15f);
+        }
 
-            if (ToolNameStyle == null) {
-                ToolNameStyle = new GUIStyle();
+        /// <summary>
+        /// Initialize ToolName Label Style
+        /// </summary>
+        private void InitToolNameStyle() {
+            if (EditorStyles.label == null)
+                ToolNameStyle = new GUIStyle("Label");
+            else
+                ToolNameStyle = new GUIStyle(EditorStyles.label);
 
-                //Tool Name Style
-                ToolNameStyle.alignment = TextAnchor.UpperCenter;
-                ToolNameStyle.fontStyle = FontStyle.Bold;
-                ToolNameStyle.fontSize = 13;
-            }
+            ToolNameStyle.margin = new RectOffset(3, 3, 2, 2);
+            ToolNameStyle.padding = new RectOffset(1, 1, 0, 0);
+            ToolNameStyle.alignment = TextAnchor.UpperCenter;
+            ToolNameStyle.fontStyle = FontStyle.Bold;
+            ToolNameStyle.fontSize = 13;
+
         }
 
         /// <summary>
