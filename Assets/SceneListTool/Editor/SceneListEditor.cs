@@ -9,10 +9,12 @@ namespace SceneListTool {
     public class SceneListEditor : EditorWindow {
         #region TEMPLATE_VARIABLES
         private GUIStyle ToolNameStyle;
+        private GUIStyle HelpButtonStyle;
 
         private Rect TemplateBackgroundRect;
         private Rect TitleBackgroundRect;
         private Rect ToolTitleNameRect;
+        private Rect HelpRect;
         private Rect TradeMarkBackgroundRect;
         private Rect AuthorRect;
         private Rect VersionRect;
@@ -22,6 +24,7 @@ namespace SceneListTool {
 
         private GUIContent authorInfo = new GUIContent("Author - Jisan Haider Joy", "Find me at,\nhttps://www.facebook.com/jisanhaiderjoy");
         private GUIContent toolTitle = new GUIContent("Scene List", "Title ToolTip");
+        private GUIContent helpTitle = new GUIContent("", "Need Help?");
 
         private string version = "version - 1.0.0";
         #endregion
@@ -62,12 +65,13 @@ namespace SceneListTool {
 
         private GUIStyle ScrollElementBackground;
         private Texture2D ScrollElementBGTexture;
+        private bool isProSkin = false;
         #endregion
 
         #region BUTTON_GROUP_GUICONTENT
         GUIContent Open = new GUIContent("Open", "Open Scene Single");
         GUIContent Add = new GUIContent("Add", "Open Scene Additive");
-        GUIContent Ping = new GUIContent("Ping", "Select file on the project window");
+        GUIContent Locate = new GUIContent("Locate", "Select file on the project window");
         GUIContent Delete = new GUIContent("Delete", "Delete the selected scene");
         GUIContent AddToBuild = new GUIContent("Add To Build", "Add to Build list and adjust if needed");
         #endregion
@@ -85,7 +89,7 @@ namespace SceneListTool {
         static void InitWindow() {
             // Get existing open window or if none, make a new one:
             SceneListEditor window = (SceneListEditor)GetWindow(typeof(SceneListEditor), false, "Scene List Tool", true);
-            window.minSize = new Vector2(300, 300);
+            window.minSize = new Vector2(305, 305);
             window.Show();
         }
 
@@ -93,12 +97,13 @@ namespace SceneListTool {
         /// Called by Unity For Initialization
         /// </summary>
         private void OnEnable() {
+            //Checks If ProSkin
+            isProSkin = EditorGUIUtility.isProSkin;
             //Cache the Window Size
             windowPosition = position;
 
-            //Checks If ProSkin
             //Adjusts the color of Tool based on the Editor Skin
-            if (EditorGUIUtility.isProSkin) {
+            if (isProSkin) {
                 editorSkinColor = new Color(0.1764706f, 0.1764706f, 0.1764706f, 1f);
                 editorSkinBGColor = new Color(0.2196078f, 0.2196078f, 0.2196078f, 1f);
             }
@@ -106,16 +111,16 @@ namespace SceneListTool {
             //Init Template Design Variables
             TemplateInit();
 
-            //Load Toolbar icon
-            topToolbarNames[0].image = (Texture)EditorGUIUtility.Load("SceneAsset Icon");
-            topToolbarNames[1].image = (Texture)EditorGUIUtility.Load("Favorite Icon");
-            topToolbarNames[2].image = (Texture)EditorGUIUtility.Load("CustomSorting");
+            //Load Toolbar icon based on Pro/Personal Skin
+            topToolbarNames[0].image = (Texture)EditorGUIUtility.Load(isProSkin ? "d_SceneAsset Icon" : "SceneAsset Icon");
+            topToolbarNames[1].image = (Texture)EditorGUIUtility.Load(isProSkin ? "d_Favorite Icon" : "d_Favorite Icon");
+            topToolbarNames[2].image = (Texture)EditorGUIUtility.Load(isProSkin ? "d_CustomSorting" : "CustomSorting");
 
-            //Load Refresh Button Icon
-            RefreshButton.image = (Texture)EditorGUIUtility.Load("RotateTool");
+            //Load Refresh Button Icon based on Pro/Personal Skin
+            RefreshButton.image = (Texture)EditorGUIUtility.Load(isProSkin ? "d_RotateTool" : "RotateTool");
 
-            //Load Button Asset Icon
-            AddToBuild.image = (Texture)EditorGUIUtility.Load("UnityEditor.SceneHierarchyWindow");
+            //Load Button Asset Icon based on Pro/Personal Skin
+            AddToBuild.image = (Texture)EditorGUIUtility.Load(isProSkin ? "d_UnityEditor.SceneHierarchyWindow" : "UnityEditor.SceneHierarchyWindow");
 
             //Gets the Project Path
             projectPath = Application.dataPath;
@@ -202,6 +207,9 @@ namespace SceneListTool {
 
             if (ToolNameStyle == null)
                 InitToolNameStyle();
+
+            if (HelpButtonStyle == null)
+                HelpButtonStyle = new GUIStyle("IconButton");
             #endregion
 
             //Cache the Window Size
@@ -246,6 +254,9 @@ namespace SceneListTool {
             } else if (topToolbarSelection == 2) {
                 //Draws The "Build List"
                 DrawBuildList();
+            } else if (topToolbarSelection == 3) {
+                //Draws The "Build List"
+                DrawHelpGUI();
             }
             #endregion
         }
@@ -416,54 +427,129 @@ namespace SceneListTool {
             //Creates a ScrollView
             scrollPos = EditorGUILayout.BeginScrollView(scrollPos, false, false, GUILayout.Height(windowPosition.height - 104 - 37));
             {
-                reorderableList.DoLayoutList();
-
-                if (GUILayout.Button("Apply To Build Settings")) {
-                    SetEditorBuildSettingsScenes();
-                }
-
-                if (GUILayout.Button("Open Build Settings")) {
-                    GetWindow(System.Type.GetType("UnityEditor.BuildPlayerWindow,UnityEditor"), true);
-                }
-
-                GUILayout.Space(5);
-
-                EditorGUILayout.LabelField("Handy Shortcut Buttons", EditorStyles.boldLabel == null ? "Label" : EditorStyles.boldLabel);
-
-                EditorGUILayout.BeginHorizontal();
+                EditorGUILayout.BeginVertical(ScrollElementBackground);
                 {
-                    if (GUILayout.Button("Open Project Settings")) {
-                        EditorApplication.ExecuteMenuItem("Edit/Project Settings...");
-                    }
-
-                    if (GUILayout.Button("Open Lighting Settings")) {
-                        EditorApplication.ExecuteMenuItem("Window/Rendering/Lighting Settings");
-                    }
-                }
-                EditorGUILayout.EndHorizontal();
-
-                if (GUILayout.Button("Reset SceneList Data")) {
-                    if (EditorUtility.DisplayDialog("Reset Scene List Data?", "Are you sure you want to reset all the Data? \nYou can't Undo this action", "Yes", "No")) {
-                        //No Starred Scene. Empty List
-                        SavedData.FavoriteScenes.Clear();
-                        //No Build Scene List. Empty List
+                    if (GUILayout.Button("Get Current Build Settings")) {
+                        //Clear Old Data
                         SavedData.BuildScenes.Clear();
                         SavedData.BuildScenes_Enabled.Clear();
 
-                        //Saves into Scriptable Asset
+                        //Load Build Scenes into List
+                        for (int i = 0; i < EditorBuildSettings.scenes.Length; i++) {
+                            SavedData.BuildScenes.Add(AssetDatabase.LoadAssetAtPath<SceneAsset>(EditorBuildSettings.scenes[i].path));
+                            SavedData.BuildScenes_Enabled.Add(EditorBuildSettings.scenes[i].enabled);
+                        }
+
                         EditorUtility.SetDirty(SavedData);
                         AssetDatabase.SaveAssets();
+                    }
 
-                        //Refresh the data for UI
-                        RefreshList();
+                    GUILayout.Space(5);
+                    reorderableList.DoLayoutList();
+
+                    if (GUILayout.Button("Apply To Build Settings")) {
+                        SetEditorBuildSettingsScenes();
+                    }
+
+                    if (GUILayout.Button("Open Build Settings")) {
+                        GetWindow(System.Type.GetType("UnityEditor.BuildPlayerWindow,UnityEditor"), true);
                     }
                 }
+                EditorGUILayout.EndVertical();
+
+                GUILayout.Space(5);
+
+                EditorGUILayout.BeginVertical(ScrollElementBackground);
+                {
+                    EditorGUILayout.LabelField("Handy Shortcut Buttons", EditorStyles.boldLabel == null ? "Label" : EditorStyles.boldLabel);
+
+                    EditorGUILayout.BeginHorizontal();
+                    {
+                        if (GUILayout.Button("Open Project Settings")) {
+                            EditorApplication.ExecuteMenuItem("Edit/Project Settings...");
+                        }
+
+                        if (GUILayout.Button("Open Lighting Settings")) {
+                            EditorApplication.ExecuteMenuItem("Window/Rendering/Lighting Settings");
+                        }
+                    }
+                    EditorGUILayout.EndHorizontal();
+
+                    if (GUILayout.Button("Reset SceneList Data")) {
+                        if (EditorUtility.DisplayDialog("Reset Scene List Data?", "Are you sure you want to reset all the Data? \nYou can't Undo this action", "Yes", "No")) {
+                            //No Starred Scene. Empty List
+                            SavedData.FavoriteScenes.Clear();
+                            //No Build Scene List. Empty List
+                            SavedData.BuildScenes.Clear();
+                            SavedData.BuildScenes_Enabled.Clear();
+
+                            //Saves into Scriptable Asset
+                            EditorUtility.SetDirty(SavedData);
+                            AssetDatabase.SaveAssets();
+
+                            //Refresh the data for UI
+                            RefreshList();
+                        }
+                    }
+                }
+                EditorGUILayout.EndVertical();
+
+                GUILayout.Space(15);
+                DrawHelpGUI();
             }
             EditorGUILayout.EndScrollView();
+        }
+
+        /// <summary>
+        /// Draws the Help Buttons GUI. Shows the ways of Contacting Dev
+        /// </summary>
+        private void DrawHelpGUI() {
+            //Creates an Initial Spacing from the Toolbar
+            GUILayout.Space(15);
+
+            //VerticalArea Created to Show the Background
+            EditorGUILayout.BeginVertical(ScrollElementBackground);
+            {
+                //Contact Me Label
+                GUILayout.Label("Need help? Contact me via:");
+
+                GUILayout.BeginHorizontal();
+                {
+                    //Contact Through Facebook
+                    if (GUILayout.Button(new GUIContent("Facebook"))) { Facebook(); }
+
+                    //Contact Through Official E-mail
+                    if (GUILayout.Button(new GUIContent("E-mail"))) { Email(); }
+
+                    //Contact Through Official Instagram
+                    if (GUILayout.Button(new GUIContent("Instagram"))) { Instagram(); }
+                }
+                GUILayout.EndHorizontal();
+
+                //Contact Through Website
+                if (GUILayout.Button(new GUIContent("Unity Connect"))) { Website(); }
+            }
+            EditorGUILayout.EndVertical();
         }
         #endregion
 
         #region HELPERS
+        void Facebook() {
+            Application.OpenURL("https://www.facebook.com/gamesheadshot/");
+        }
+
+        void Email() {
+            Application.OpenURL("mailto:headshotgamesstudio@gmail.com?cc=jisanhaider76@gmail.com&subject=Scene%20List%20Tool%20Help%20Contact");
+        }
+
+        void Instagram() {
+            Application.OpenURL("https://www.instagram.com/gamesheadshot/");
+        }
+
+        void Website() {
+            Application.OpenURL("https://connect.unity.com/t/headshot-games");
+        }
+
         /// <summary>
         /// Callback for Drawing the Header On GUI
         /// </summary>
@@ -505,7 +591,7 @@ namespace SceneListTool {
             Rect _objectRect = rect;
             _objectRect.width -= 20f;
             _objectRect.x += 20f;
-            _objectRect.width += 2f;
+            //_objectRect.width += 2f;
 
             //Make Sure Object Field is Enabled
             GUI.enabled = true;
@@ -664,13 +750,13 @@ namespace SceneListTool {
                 //It will always stay in the Center.
                 GUILayout.Space(bg_center - 27f);
 
-                //Button Group 1 - "Open Button" & "Ping Button"
+                //Button Group 1 - "Open Button" & "Locate Button"
                 #region BUTTON_GROUP_1
                 //Creates a Horizontal Layout
                 EditorGUILayout.BeginHorizontal();
                 {
                     //Open Button
-                    if (GUILayout.Button(Open, GUILayout.Width(53f), GUILayout.Height(18))) {
+                    if (GUILayout.Button(Open, GUILayout.Width(51f), GUILayout.Height(18))) {
                         //Save Diaglos box shown for Dirty Scene
                         if (EditorSceneManager.GetActiveScene().isDirty) {
                             EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo();
@@ -680,8 +766,8 @@ namespace SceneListTool {
                         EditorSceneManager.OpenScene(scenePaths[i].text, OpenSceneMode.Single);
                     }
 
-                    //Ping Button
-                    if (GUILayout.Button(Ping, GUILayout.Width(53f), GUILayout.Height(18))) {
+                    //Locate Button
+                    if (GUILayout.Button(Locate, GUILayout.Width(51f), GUILayout.Height(18))) {
                         //Project Browser Window Showed if not Shown
                         GetWindow(System.Type.GetType("UnityEditor.ProjectBrowser,UnityEditor"));
                         Selection.activeObject = AssetDatabase.LoadMainAssetAtPath(scenePaths[i].text);
@@ -698,7 +784,7 @@ namespace SceneListTool {
                 EditorGUILayout.BeginHorizontal();
                 {
                     //Add button
-                    if (GUILayout.Button(Add, GUILayout.Width(53f), GUILayout.Height(18))) {
+                    if (GUILayout.Button(Add, GUILayout.Width(51f), GUILayout.Height(18))) {
                         //Save Diaglos box shown for Dirty Scene
                         if (EditorSceneManager.GetActiveScene().isDirty) {
                             EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo();
@@ -708,7 +794,7 @@ namespace SceneListTool {
                     }
 
                     //Delete Button
-                    if (GUILayout.Button(Delete, GUILayout.Width(53f), GUILayout.Height(18))) {
+                    if (GUILayout.Button(Delete, GUILayout.Width(51f), GUILayout.Height(18))) {
                         if (EditorUtility.DisplayDialog("Delete Selected Scene?", scenePaths[i].text + "\nAre you sure you want to delete the scene? \nYou can't Undo this action", "Yes", "No")) {
                             AssetDatabase.DeleteAsset(scenePaths[i].text);
 
@@ -722,7 +808,7 @@ namespace SceneListTool {
                 #endregion
 
                 //Creates the AddToBuild Button
-                if (GUILayout.Button(AddToBuild, GUILayout.Width(109f), GUILayout.Height(18))) {
+                if (GUILayout.Button(AddToBuild, GUILayout.Width(105.5f), GUILayout.Height(18))) {
                     //Creates Scene Asset from path
                     SceneAsset _scene = AssetDatabase.LoadAssetAtPath<SceneAsset>(scenePaths[i].text);
 
@@ -817,7 +903,7 @@ namespace SceneListTool {
             //Inactive Star Icon
             //Checks If ProSkin
             //Adjusts the color of Tool based on the Editor Skin
-            if (EditorGUIUtility.isProSkin) {
+            if (isProSkin) {
                 starStyle.normal.background = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SceneListTool/star_inactive_pro.png");
                 starStyle.hover.background = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SceneListTool/star_inactive_pro.png");
                 starStyle.active.background = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SceneListTool/star_inactive_pro.png");
@@ -864,18 +950,22 @@ namespace SceneListTool {
         //A Signature Template Design, for Jisan Haider Joy
         private void DrawTemplate() {
             //Background Color
-            if (!EditorGUIUtility.isProSkin) {
+            if (!isProSkin) {
                 EditorGUI.DrawRect(TemplateBackgroundRect, editorSkinBGColor);
             }
 
             //Top Design
             #region Top Design
-            //float TopRectHeight = 40;
             //Label Background Rects
             EditorGUI.DrawRect(TitleBackgroundRect, editorSkinColor);
 
             //Tool Name Text
             GUI.Label(ToolTitleNameRect, toolTitle, ToolNameStyle);
+
+            //Help Button on Top
+            if (GUI.Button(HelpRect, helpTitle, HelpButtonStyle)) {
+                topToolbarSelection = 3;
+            }
             #endregion
 
             //Bottom Design TradeMark
@@ -901,9 +991,14 @@ namespace SceneListTool {
             //Title Name Background Rect
             TitleBackgroundRect = new Rect(0, 0, windowPosition.width, 40);
             //Title Name Rect
-            ToolTitleNameRect = new Rect(0, (40 / 2f - 10f), windowPosition.width, 20f);
-            //Load Title Scene Asset Icon
-            toolTitle.image = (Texture)EditorGUIUtility.Load("SceneAsset Icon");
+            ToolTitleNameRect = new Rect((windowPosition.width / 2f) - 161.5f, (40 / 2f - 10f), 323f, 20f);
+            //Load Title Scene Asset Icon based on Pro/Personal Skin
+            toolTitle.image = (Texture)EditorGUIUtility.Load(isProSkin ? "d_SceneAsset Icon" : "SceneAsset Icon");
+
+            //Help Button Rect
+            HelpRect = new Rect(windowPosition.width - 25f, (40 / 2f - 8f), 32f, 32f);
+            //Help Button Icon based on Pro/Personal Skin
+            helpTitle.image = (Texture)EditorGUIUtility.Load(isProSkin ? "d__Help@2x" : "_Help@2x");
 
             //Bottom Trademark Background Rect
             TradeMarkBackgroundRect = new Rect(0, windowPosition.height - 30f, windowPosition.width, 30f);
@@ -939,7 +1034,9 @@ namespace SceneListTool {
 
             TitleBackgroundRect.width = windowPosition.width;
 
-            ToolTitleNameRect.width = windowPosition.width;
+            //ToolTitleNameRect.width = windowPosition.width;
+            ToolTitleNameRect.x = (windowPosition.width / 2f) - 161.5f;
+            HelpRect.x = windowPosition.width - 25f;
 
             TradeMarkBackgroundRect.width = windowPosition.width;
             TradeMarkBackgroundRect.y = windowPosition.height - 30f;
