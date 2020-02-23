@@ -9,18 +9,14 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: bce66b585bcc94f5890c41adb8cdf023, type: 3}
+  m_Script: {fileID: -3481846, guid: cefcf24465ef5446e816fb932c5e23f9, type: 3}
   m_Name: SceneListData
   m_EditorClassIdentifier: 
   FavoriteScenes:
   - Assets/Scenes/SampleScene.unity
-  - Assets/Minimalist Free v2.4.2/Demos/LaraCroftGoDemo/LaraCroftGo.unity
-  - Assets/Minimalist Free v2.4.2/Demos/MonumentValleyDemo/Monument Valley.unity
-  - Assets/Modern UI Pack/Scenes/Demo.unity
+  - Assets/Scenes/SampleScene2SampleScene2SampleScene2SampleScene2SampleScene2SampleScene2.unity
+  - Assets/Scenes/SampleScene 3.unity
   BuildScenes:
-  - {fileID: 102900000, guid: 00c928bfb78bad34fadd6f293313da35, type: 3}
-  - {fileID: 102900000, guid: ae8f4b8dcf1ea2640a0a73cb4c377da7, type: 3}
   - {fileID: 102900000, guid: 3067e14987e7ddd4887e964a671a0d31, type: 3}
-  - {fileID: 102900000, guid: 30f7368ecd2e2b44c8d432c1c1e6d419, type: 3}
   - {fileID: 102900000, guid: 9fc0d4010bbf28b4594072e72b8655ab, type: 3}
-  BuildScenes_Enabled: 0001000001
+  BuildScenes_Enabled: 0100
