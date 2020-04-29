@@ -9,14 +9,17 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: -3481846, guid: cefcf24465ef5446e816fb932c5e23f9, type: 3}
+  m_Script: {fileID: 11500000, guid: cda4be7a871e047b6b6c1239ecb69b37, type: 3}
   m_Name: SceneListData
   m_EditorClassIdentifier: 
   FavoriteScenes:
-  - Assets/Scenes/SampleScene.unity
+  - Assets/LaraCroftGo Dummy/LaraCroftGo.unity
+  - Assets/Scenes/SampleScene 4.unity
   - Assets/Scenes/SampleScene2SampleScene2SampleScene2SampleScene2SampleScene2SampleScene2.unity
-  - Assets/Scenes/SampleScene 3.unity
+  - Assets/Scenes/SampleScene 5.unity
+  - Assets/Scenes/SampleScene.unity
+  - Assets/Some Assets/Demos/Isometric Scene/IsoCasualGame.unity
   BuildScenes:
-  - {fileID: 102900000, guid: 3067e14987e7ddd4887e964a671a0d31, type: 3}
+  - {fileID: 102900000, guid: 00c928bfb78bad34fadd6f293313da35, type: 3}
   - {fileID: 102900000, guid: 9fc0d4010bbf28b4594072e72b8655ab, type: 3}
-  BuildScenes_Enabled: 0100
+  BuildScenes_Enabled: 0101
