@@ -27,7 +27,7 @@ namespace SceneListToolLibrary {
         private GUIContent toolTitle = new GUIContent("Scene List", "Title ToolTip");
         private GUIContent helpTitle = new GUIContent("", "Need Help?");
 
-        private string version = "version - 1.0.0";
+        private string version = "version - 1.1.0";
         #endregion
 
         #region TOOLBAR_VARIABLES
@@ -63,6 +63,8 @@ namespace SceneListToolLibrary {
         private string StarredSearchString = "";
         //Search Cancel Button Skin
         private GUIStyle CancelButtonSkin;
+        //Search TextBox Skin
+        private GUIStyle SearchBarSkin;
 
         private SceneListData SavedData;
 
@@ -160,10 +162,6 @@ namespace SceneListToolLibrary {
             //Load Button Asset Icon based on Pro/Personal Skin
             AddToBuild.image = (Texture)EditorGUIUtility.Load(isProSkin ? "d_UnityEditor.SceneHierarchyWindow" : "UnityEditor.SceneHierarchyWindow");
 
-            //Load Cancel Button Skin
-            if(CancelButtonSkin == null)
-                CancelButtonSkin = GUI.skin.FindStyle("ToolbarSeachCancelButton");
-
             //Gets the Project Path
             projectPath = Application.dataPath;
 
@@ -259,6 +257,10 @@ namespace SceneListToolLibrary {
             //Load Cancel Button Skin
             if (CancelButtonSkin == null)
                 CancelButtonSkin = GUI.skin.FindStyle("ToolbarSeachCancelButton");
+
+            //Load Search Bar Skin
+            if (SearchBarSkin == null)
+                SearchBarSkin = GUI.skin.FindStyle("ToolbarSeachTextField");
             #endregion
 
             //Cache the Window Size
@@ -286,7 +288,15 @@ namespace SceneListToolLibrary {
             //ToolBar X Pos Spacing
             GUILayout.Space(25);
             //ToolBar GUI Create
-            topToolbarSelection = GUILayout.Toolbar(topToolbarSelection, topToolbarNames, GUILayout.Width(windowPosition.width - 50f), GUILayout.Height(30));
+            var _tSelection = GUILayout.Toolbar(topToolbarSelection, topToolbarNames, GUILayout.Width(windowPosition.width - 50f), GUILayout.Height(30));
+
+            //If Toolbar menu Selection has been changed, Focus on any GUI from the previous menu will be taken off
+            if (_tSelection != topToolbarSelection)
+                GUI.FocusControl(null);
+
+            //TopToolbar variable is updated
+            topToolbarSelection = _tSelection;
+
             //ToolBar X Pos Spacing
             GUILayout.Space(25);
             EditorGUILayout.EndHorizontal();
@@ -994,9 +1004,9 @@ namespace SceneListToolLibrary {
             //Begins a horizontalScope
             EditorGUILayout.BeginHorizontal();
             //To keep proper Alignment, it is slightly moved to right
-            GUILayout.Space(4f);
+            GUILayout.Space(5f);
             //Search String is Stored
-            SearchString = EditorGUILayout.TextField(SearchString, EditorStyles.toolbarSearchField);
+            SearchString = EditorGUILayout.TextField(SearchString, SearchBarSkin);
 
             //If there's any input in the SearchBar, Search Cancel button will be drawn
             if (SearchString.Length > 0)
@@ -1006,12 +1016,15 @@ namespace SceneListToolLibrary {
 
                 //The Cancel Button is Drawn
                 if(GUILayout.Button("",CancelButtonSkin)){
-                    Debug.Log("Cacnel");
                     //String is Cleared
                     SearchString = "";
                     //Remove focus if cleared
                     GUI.FocusControl(null);
                 }
+            }
+            else
+            {
+                GUILayout.Space(2f);
             }
             EditorGUILayout.EndHorizontal();
         }
