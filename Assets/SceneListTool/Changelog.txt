@@ -1,0 +1,25 @@
+Scene List Tool - v1.1.0
+
+Additions
+
+- Editor Skin Change Detection
+- Search Bar Added in All Scenes and Starred Tab
+- Minor Optimizations
+
+Fixes
+
+- Editor Window was not responsive with the Skin change of Editor
+
+
+Scene List Tool - v1.0.0
+
+Additions
+
+- First Release
+- All Scene List from the Project
+- Scenes can be starred from All Scenes Tab
+- Starred Scene List
+- Scenes in the Build Settings
+- Scenes can be added/removed from the Build Settings
+- Handy Shortcut Buttons
+- Contact Methods
