@@ -6,8 +6,10 @@ using UnityEngine;
 using UnityEditorInternal;
 using System.Reflection;
 
-namespace SceneListToolLibrary {
-    public class SceneListEditor : EditorWindow {
+namespace SceneListToolLibrary
+{
+    public class SceneListEditor : EditorWindow
+    {
         #region TEMPLATE_VARIABLES
         private GUIStyle ToolNameStyle;
         private GUIStyle HelpButtonStyle;
@@ -20,8 +22,8 @@ namespace SceneListToolLibrary {
         private Rect AuthorRect;
         private Rect VersionRect;
 
-        private Color editorSkinColor = new Color(0.690f, 0.698f, 0.710f, 1f);
-        private Color editorSkinBGColor = new Color(0.439f, 0.451f, 0.471f, 1f);
+        private Color editorSkinColor = new Color(0.7607844f, 0.7607844f, 0.7607844f, 1f);
+        private Color editorSkinBGColor = new Color(0.6352941f, 0.6352941f, 0.6352941f, 1f);
 
         private GUIContent authorInfo = new GUIContent("Author - Jisan Haider Joy", "Find me at,\nhttps://www.facebook.com/jisanhaiderjoy");
         private GUIContent toolTitle = new GUIContent("Scene List", "Title ToolTip");
@@ -57,15 +59,21 @@ namespace SceneListToolLibrary {
         private Vector2 scrollPos;
         #endregion
 
-        #region GLOBAL_VARIABLES
+        #region SEARCH
+        //SearchField for v2019.2.x or Less
+        UnityEditor.IMGUI.Controls.SearchField searchField;
         //Search Button String is stored here
         private string AllSearchString = "";
         private string StarredSearchString = "";
         //Search Cancel Button Skin
         private GUIStyle CancelButtonSkin;
         //Search TextBox Skin
+        private GUIStyle SearchEmptySkin;
+        //Search TextBox Skin
         private GUIStyle SearchBarSkin;
+        #endregion
 
+        #region GLOBAL_VARIABLES
         private SceneListData SavedData;
 
         private Rect windowPosition;
@@ -75,9 +83,11 @@ namespace SceneListToolLibrary {
         private GUIStyle ScrollElementBackground;
         private Texture2D ScrollElementBGTexture;
         private bool isProSkin = false;
+        private bool isEditorSkinChanged = false;
 
         private int UnityVersion = 0;
         private bool IS_2019_OR_NEWER = false;
+        private bool IS_2019_3_OR_NEWER = false;
         #endregion
 
         #region BUTTON_GROUP_GUICONTENT
@@ -99,7 +109,8 @@ namespace SceneListToolLibrary {
         /// Called by Unity to Open the Window
         /// </summary>
         [MenuItem("Tools/Headshot Games/Scene List &#s")]
-        static void InitWindow() {
+        static void InitWindow()
+        {
             // Get existing open window or if none, make a new one:
             SceneListEditor window = (SceneListEditor)GetWindow(typeof(SceneListEditor), false, "Scene List Tool", true);
             window.minSize = new Vector2(305, 305);
@@ -109,16 +120,44 @@ namespace SceneListToolLibrary {
         /// <summary>
         /// Called by Unity For Initialization
         /// </summary>
-        private void OnEnable() {
+        private void OnEnable()
+        {
             //Gets Editor Version to Execute Version Specific Codes
 #if DEBUG
             Debug.Log(Application.unityVersion);
 #endif
+            //Version is Calculated to prevent Version dependancies for Specific assets
             UnityVersion = int.Parse(Application.unityVersion.Substring(0, 4));
-            if (UnityVersion >= 2019) {
+            if (UnityVersion >= 2019)
+            {
+                //Means Unity 2019.x.x or Above
                 IS_2019_OR_NEWER = true;
-            } else {
+
+                //Checks if version is 2019.3.x or 2019.2.x or Lower
+                if (int.Parse(Application.unityVersion.Substring(5, 1)) >= 3)
+                {
+                    //Means Unity 2019.3.x 
+                    IS_2019_3_OR_NEWER = true;
+                }
+                else
+                {
+                    //Means 2019.2.x or Lower
+                    IS_2019_3_OR_NEWER = false;
+                    //Selectively Initialized to reduce Unnecessary Initialization
+                    //Search field is initialized
+                    if (searchField == null)
+                        searchField = new UnityEditor.IMGUI.Controls.SearchField();
+                }
+            }
+            else
+            {
+                //Means lower than 2019.x.x
                 IS_2019_OR_NEWER = false;
+                IS_2019_3_OR_NEWER = false;
+                //Selectively Initialized to reduce Unnecessary Initialization
+                //Search field is initialized
+                if (searchField == null)
+                    searchField = new UnityEditor.IMGUI.Controls.SearchField();
             }
 #if DEBUG
             Debug.Log("Substring Version : " + UnityVersion);
@@ -130,26 +169,44 @@ namespace SceneListToolLibrary {
 #else
             version = "version - " + Assembly.GetExecutingAssembly().GetName().Version.ToString(3);
 #endif
+
+            //Checks if there is a change in Skin on Editor
+            isEditorSkinChanged = isProSkin != EditorGUIUtility.isProSkin;
+
+#if DEBUG
+            if (isEditorSkinChanged)
+                Debug.Log("Change in Skin");
+#endif
+
             //Checks If ProSkin
             isProSkin = EditorGUIUtility.isProSkin;
             //Cache the Window Size
             windowPosition = position;
 
             //Adjusts the color of Tool based on the Editor Skin
-            if (isProSkin) {
+            if (isProSkin)
+            {
                 editorSkinColor = new Color(0.1764706f, 0.1764706f, 0.1764706f, 1f);
                 editorSkinBGColor = new Color(0.2196078f, 0.2196078f, 0.2196078f, 1f);
+            }
+            else
+            {
+                editorSkinColor = new Color(0.7607844f, 0.7607844f, 0.7607844f, 1f);
+                editorSkinBGColor = new Color(0.6352941f, 0.6352941f, 0.6352941f, 1f);
             }
 
             //Init Template Design Variables
             TemplateInit();
 
-            if (IS_2019_OR_NEWER) {
+            if (IS_2019_OR_NEWER)
+            {
                 //Load Toolbar icon based on Pro/Personal Skin
                 topToolbarNames[0].image = (Texture)EditorGUIUtility.Load(isProSkin ? "d_SceneAsset Icon" : "SceneAsset Icon");
                 topToolbarNames[1].image = (Texture)EditorGUIUtility.Load(isProSkin ? "d_Favorite Icon" : "Favorite Icon");
                 topToolbarNames[2].image = (Texture)EditorGUIUtility.Load(isProSkin ? "d_CustomSorting" : "CustomSorting");
-            } else {
+            }
+            else
+            {
                 //Load Toolbar icon based on Pro/Personal Skin
                 topToolbarNames[0].image = (Texture)EditorGUIUtility.Load("SceneAsset Icon");
                 topToolbarNames[1].image = (Texture)EditorGUIUtility.Load("Favorite Icon");
@@ -170,7 +227,8 @@ namespace SceneListToolLibrary {
             SavedData = AssetDatabase.LoadAssetAtPath<SceneListData>("Assets/SceneListTool/Data/SceneListData.asset");
 
             //If Scriptable Data is not found, a new one is created and initialized for use
-            if (SavedData == null) {
+            if (SavedData == null)
+            {
                 SavedData = CreateInstance<SceneListData>();
                 AssetDatabase.CreateAsset(SavedData, "Assets/SceneListTool/Data/SceneListData.asset");
 
@@ -182,7 +240,8 @@ namespace SceneListToolLibrary {
                 SavedData.BuildScenes_Enabled = new List<bool>();
 
                 //Load Build Scenes into List
-                for (int i = 0; i < EditorBuildSettings.scenes.Length; i++) {
+                for (int i = 0; i < EditorBuildSettings.scenes.Length; i++)
+                {
                     SavedData.BuildScenes.Add(AssetDatabase.LoadAssetAtPath<SceneAsset>(EditorBuildSettings.scenes[i].path));
                     SavedData.BuildScenes_Enabled.Add(EditorBuildSettings.scenes[i].enabled);
                 }
@@ -191,7 +250,8 @@ namespace SceneListToolLibrary {
                 AssetDatabase.SaveAssets();
             }
 
-            if (reorderableList == null || reorderableList.list == null) {
+            if (reorderableList == null || reorderableList.list == null)
+            {
                 //Setup Reorderable List for the Scene List
                 reorderableList = new ReorderableList(SavedData.BuildScenes, typeof(SceneListData), true, true, true, true);
 
@@ -211,11 +271,13 @@ namespace SceneListToolLibrary {
             RefreshList();
         }
 
-        private void OnDisable() {
+        private void OnDisable()
+        {
             EditorBuildSettings.sceneListChanged -= SceneListChangeCallback;
         }
 
-        private void OnDestroy() {
+        private void OnDestroy()
+        {
             DestroyImmediate(ScrollElementBGTexture);
             ScrollElementBackground = null;
             System.GC.Collect();
@@ -225,7 +287,8 @@ namespace SceneListToolLibrary {
         /// Called by Unity, When the Project is changed in anyway.
         /// Refreshes the Scene List if a Scene is Added/Deleted/Modified
         /// </summary>
-        private void OnProjectChange() {
+        private void OnProjectChange()
+        {
             RefreshList();
             Repaint();
         }
@@ -233,9 +296,30 @@ namespace SceneListToolLibrary {
         /// <summary>
         /// Called by Unity on every frame of GUI
         /// </summary>
-        private void OnGUI() {
+        private void OnGUI()
+        {
             //Styles Initializations
             #region StylesInitializations
+            //If Editor Skin is Changed while the Editor Window is Open
+            //Then all the Styles are updated
+            if (isEditorSkinChanged)
+            {
+                InitStarToggleIcon();
+                InitScrollElementBackground();
+                InitSceneNameStyle();
+                InitScenePathStyle();
+                InitToolNameStyle();
+                HelpButtonStyle = new GUIStyle("IconButton");
+                CancelButtonSkin = new GUIStyle("ToolbarSeachCancelButton");
+                SearchBarSkin = new GUIStyle("ToolbarSeachTextField");
+                SearchEmptySkin = new GUIStyle("ToolbarSeachCancelButtonEmpty");
+
+                System.GC.Collect();
+
+                //Skin Change Reset
+                isEditorSkinChanged = false;
+            }
+
             if (starStyle == null)
                 InitStarToggleIcon();
 
@@ -256,11 +340,18 @@ namespace SceneListToolLibrary {
 
             //Load Cancel Button Skin
             if (CancelButtonSkin == null)
-                CancelButtonSkin = GUI.skin.FindStyle("ToolbarSeachCancelButton");
+            {
+                CancelButtonSkin = new GUIStyle("ToolbarSeachCancelButton");
+                //CancelButtonSkin.normal.
+            }
 
             //Load Search Bar Skin
             if (SearchBarSkin == null)
-                SearchBarSkin = GUI.skin.FindStyle("ToolbarSeachTextField");
+                SearchBarSkin = new GUIStyle("ToolbarSeachTextField");
+
+            //Load Search Empty Skin
+            if (SearchEmptySkin == null)
+                SearchEmptySkin = new GUIStyle("ToolbarSeachCancelButtonEmpty");
             #endregion
 
             //Cache the Window Size
@@ -304,16 +395,23 @@ namespace SceneListToolLibrary {
 
             //Based on the Toolbar Selection, UI is Drawn
             #region BODY_DRAW
-            if (topToolbarSelection == 0) {
+            if (topToolbarSelection == 0)
+            {
                 //Draws the "All Scenes" List.
                 DrawAllScene();
-            } else if (topToolbarSelection == 1) {
+            }
+            else if (topToolbarSelection == 1)
+            {
                 //Draws the "Starred Scene" List.
                 DrawStarredScene();
-            } else if (topToolbarSelection == 2) {
+            }
+            else if (topToolbarSelection == 2)
+            {
                 //Draws The "Build List"
                 DrawBuildList();
-            } else if (topToolbarSelection == 3) {
+            }
+            else if (topToolbarSelection == 3)
+            {
                 //Creates an Initial Spacing from the Toolbar
                 GUILayout.Space(15);
                 //Draws The "Build List"
@@ -327,12 +425,14 @@ namespace SceneListToolLibrary {
         /// <summary>
         /// Draws the "All Scenes" List. In other terms, Draws the List of All available Scenes in the Project
         /// </summary>
-        private void DrawAllScene() {
+        private void DrawAllScene()
+        {
             //Creates an Initial Spacing from the Toolbar
             GUILayout.Space(15);
 
             //Refresh List Button
-            if (GUILayout.Button(RefreshButton, GUILayout.Height(20f))) {
+            if (GUILayout.Button(RefreshButton, GUILayout.Height(20f)))
+            {
                 RefreshList();
                 Repaint();
             }
@@ -340,12 +440,11 @@ namespace SceneListToolLibrary {
             //Draws Search Bar
             DrawSearchBar(ref AllSearchString);
 
-            //A Spacing after the Refresh Button
-            GUILayout.Space(3f);
-            scrollPos = EditorGUILayout.BeginScrollView(scrollPos, false, false, GUILayout.Height(windowPosition.height - 190f)); //- 104 - 37 - 23f - 25f
+            scrollPos = EditorGUILayout.BeginScrollView(scrollPos, false, false, GUILayout.Height(windowPosition.height - 188f)); //- 104 - 37 - 23f - 25f
             {
                 //Loops through all the scenes found in the Project
-                for (int i = 0; i < sceneNames.Length; i++) {
+                for (int i = 0; i < sceneNames.Length; i++)
+                {
                     //If there's a Search Text, In that case each Scene names will be searched with the text
                     if (!sceneNames[i].text.ToLower().Contains(AllSearchString.ToLower()))
                         continue;
@@ -382,7 +481,8 @@ namespace SceneListToolLibrary {
                             var _tempBool = EditorGUILayout.Toggle(starToggles[i], starStyle, GUILayout.Height(25), GUILayout.Width(25));
 
                             //If Toggle switched to On/Off
-                            if (starToggles[i] != _tempBool) {
+                            if (starToggles[i] != _tempBool)
+                            {
                                 starToggles[i] = _tempBool;
 
                                 //If Switched On, Scene Path is added
@@ -430,18 +530,20 @@ namespace SceneListToolLibrary {
         /// <summary>
         /// Draws the Starred Scene List. In other terms, Draws the List of Favorite Scenes
         /// </summary>
-        private void DrawStarredScene() {
+        private void DrawStarredScene()
+        {
             //Creates an Initial Spacing from the Toolbar
-            GUILayout.Space(9f);
+            GUILayout.Space(12f);
 
             //Draws Search Bar
             DrawSearchBar(ref StarredSearchString);
 
             //Creates a ScrollView
-            scrollPos = EditorGUILayout.BeginScrollView(scrollPos, false, false, GUILayout.Height(windowPosition.height - 158f)); //-104 - 37 - 29f
+            scrollPos = EditorGUILayout.BeginScrollView(scrollPos, false, false, GUILayout.Height(windowPosition.height - 163f)); //-104 - 37 - 29f
             {
                 //Loops through the StarToggles that are true. Which is, the scenes that are starred
-                for (int i = 0; i < starToggles.Length; i++) {
+                for (int i = 0; i < starToggles.Length; i++)
+                {
                     //If Not Starred, Skip
                     if (!starToggles[i])
                         continue;
@@ -495,22 +597,25 @@ namespace SceneListToolLibrary {
         /// <summary>
         /// Draws the Build List. Handles the Build Settings
         /// </summary>
-        private void DrawBuildList() {
+        private void DrawBuildList()
+        {
             //Creates an Initial Spacing from the Toolbar
             GUILayout.Space(15);
 
             //Creates a ScrollView
-            scrollPos = EditorGUILayout.BeginScrollView(scrollPos, false, false, GUILayout.Height(windowPosition.height - 143f)); //-104 - 37
+            scrollPos = EditorGUILayout.BeginScrollView(scrollPos, false, false, GUILayout.Height(windowPosition.height - 141f)); //-104 - 37
             {
                 EditorGUILayout.BeginVertical(ScrollElementBackground);
                 {
-                    if (GUILayout.Button("Get Current Build Settings")) {
+                    if (GUILayout.Button("Get Current Build Settings"))
+                    {
                         //Clear Old Data
                         SavedData.BuildScenes.Clear();
                         SavedData.BuildScenes_Enabled.Clear();
 
                         //Load Build Scenes into List
-                        for (int i = 0; i < EditorBuildSettings.scenes.Length; i++) {
+                        for (int i = 0; i < EditorBuildSettings.scenes.Length; i++)
+                        {
                             SavedData.BuildScenes.Add(AssetDatabase.LoadAssetAtPath<SceneAsset>(EditorBuildSettings.scenes[i].path));
                             SavedData.BuildScenes_Enabled.Add(EditorBuildSettings.scenes[i].enabled);
                         }
@@ -522,11 +627,13 @@ namespace SceneListToolLibrary {
                     GUILayout.Space(5);
                     reorderableList.DoLayoutList();
 
-                    if (GUILayout.Button("Apply To Build Settings")) {
+                    if (GUILayout.Button("Apply To Build Settings"))
+                    {
                         SetEditorBuildSettingsScenes();
                     }
 
-                    if (GUILayout.Button("Open Build Settings")) {
+                    if (GUILayout.Button("Open Build Settings"))
+                    {
                         GetWindow(System.Type.GetType("UnityEditor.BuildPlayerWindow,UnityEditor"), true);
                     }
                 }
@@ -540,18 +647,22 @@ namespace SceneListToolLibrary {
 
                     EditorGUILayout.BeginHorizontal();
                     {
-                        if (GUILayout.Button("Open Project Settings")) {
+                        if (GUILayout.Button("Open Project Settings"))
+                        {
                             EditorApplication.ExecuteMenuItem("Edit/Project Settings...");
                         }
 
-                        if (GUILayout.Button("Open Lighting Settings")) {
+                        if (GUILayout.Button("Open Lighting Settings"))
+                        {
                             EditorApplication.ExecuteMenuItem("Window/Rendering/Lighting Settings");
                         }
                     }
                     EditorGUILayout.EndHorizontal();
 
-                    if (GUILayout.Button("Reset SceneList Data")) {
-                        if (EditorUtility.DisplayDialog("Reset Scene List Data?", "Are you sure you want to reset all the Data? \nYou can't Undo this action", "Yes", "No")) {
+                    if (GUILayout.Button("Reset SceneList Data"))
+                    {
+                        if (EditorUtility.DisplayDialog("Reset Scene List Data?", "Are you sure you want to reset all the Data? \nYou can't Undo this action", "Yes", "No"))
+                        {
                             //No Starred Scene. Empty List
                             SavedData.FavoriteScenes.Clear();
                             //No Build Scene List. Empty List
@@ -578,7 +689,8 @@ namespace SceneListToolLibrary {
         /// <summary>
         /// Draws the Help Buttons GUI. Shows the ways of Contacting Dev
         /// </summary>
-        private void DrawHelpGUI() {
+        private void DrawHelpGUI()
+        {
             //VerticalArea Created to Show the Background
             EditorGUILayout.BeginVertical(ScrollElementBackground);
             {
@@ -616,35 +728,40 @@ namespace SceneListToolLibrary {
         /// <summary>
         /// Visit Facebook Page
         /// </summary>
-        void Facebook() {
+        void Facebook()
+        {
             Application.OpenURL("https://www.facebook.com/gamesheadshot/");
         }
 
         /// <summary>
         /// Setup Mail using default mail setup
         /// </summary>
-        void Email() {
+        void Email()
+        {
             Application.OpenURL("mailto:headshotgamesstudio@gmail.com?cc=jisanhaider76@gmail.com&subject=Scene%20List%20Tool%20Help%20Contact");
         }
 
         /// <summary>
         /// Visit Instagram 
         /// </summary>
-        void Instagram() {
+        void Instagram()
+        {
             Application.OpenURL("https://www.instagram.com/gamesheadshot/");
         }
 
         /// <summary>
         /// Visit Unity Connect Page
         /// </summary>
-        void Website() {
+        void Website()
+        {
             Application.OpenURL("https://connect.unity.com/t/headshot-games");
         }
 
         /// <summary>
         /// Visit Asset Store Page
         /// </summary>
-        void VisitAssetStore() {
+        void VisitAssetStore()
+        {
             Application.OpenURL("https://assetstore.unity.com/publishers/46846");
         }
 
@@ -652,7 +769,8 @@ namespace SceneListToolLibrary {
         /// Callback for Drawing the Header On GUI
         /// </summary>
         /// <param name="rect"></param>
-        void drawHeaderCallback(Rect rect) {
+        void drawHeaderCallback(Rect rect)
+        {
             EditorGUI.LabelField(rect, "Build Scenes");
         }
 
@@ -663,7 +781,8 @@ namespace SceneListToolLibrary {
         /// <param name="index"></param>
         /// <param name="isActive"></param>
         /// <param name="isFocused"></param>
-        void drawElementCallback(Rect rect, int index, bool isActive, bool isFocused) {
+        void drawElementCallback(Rect rect, int index, bool isActive, bool isFocused)
+        {
             //ToggleRect
             Rect _toggleRect = rect;
             _toggleRect.width = 20f;
@@ -672,7 +791,8 @@ namespace SceneListToolLibrary {
             GUI.enabled = SavedData.BuildScenes[index] != null;
             //If Toggle is Changed
             var _tempToggle = EditorGUI.Toggle(_toggleRect, SavedData.BuildScenes_Enabled[index]);
-            if (_tempToggle != SavedData.BuildScenes_Enabled[index]) {
+            if (_tempToggle != SavedData.BuildScenes_Enabled[index])
+            {
                 //ListChange Flagged, to prevent callback from BuildSettings
                 ReorderableListChanged = true;
                 //Data Updated
@@ -695,7 +815,8 @@ namespace SceneListToolLibrary {
             GUI.enabled = true;
             //Object Field Drawn, and Checked for Change
             var _sceneObj = (SceneAsset)EditorGUI.ObjectField(_objectRect, SavedData.BuildScenes[index], typeof(SceneAsset), false);
-            if (_sceneObj != SavedData.BuildScenes[index]) {
+            if (_sceneObj != SavedData.BuildScenes[index])
+            {
 #if DEBUG
                 Debug.Log("Scene Field Updated");
 #endif
@@ -707,12 +828,16 @@ namespace SceneListToolLibrary {
                 bool _isNotNull = _sceneObj != null;
 
                 //If Updated Scene is Not Null, checks if the Scene is already available
-                if (_isNotNull) {
-                    if (!SavedData.BuildScenes.Contains(_sceneObj)) {
+                if (_isNotNull)
+                {
+                    if (!SavedData.BuildScenes.Contains(_sceneObj))
+                    {
                         SavedData.BuildScenes[index] = _sceneObj;
                         SavedData.BuildScenes_Enabled[index] = _isNotNull;
                     }
-                } else {
+                }
+                else
+                {
                     //IF null, List index is set null
                     SavedData.BuildScenes[index] = null;
                     SavedData.BuildScenes_Enabled[index] = _isNotNull;
@@ -730,7 +855,8 @@ namespace SceneListToolLibrary {
         /// Callback when the add button on ReoderList is pressed.
         /// </summary>
         /// <param name="l"></param>
-        void onAddCallback(ReorderableList l) {
+        void onAddCallback(ReorderableList l)
+        {
 #if DEBUG
             Debug.Log("onAddCallback");
 #endif
@@ -753,7 +879,8 @@ namespace SceneListToolLibrary {
         /// Callback when the Remove button on ReoderList is pressed.
         /// </summary>
         /// <param name="l"></param>
-        void onRemoveCallback(ReorderableList l) {
+        void onRemoveCallback(ReorderableList l)
+        {
 #if DEBUG
             Debug.Log("onRemoveCallback");
 #endif
@@ -775,7 +902,8 @@ namespace SceneListToolLibrary {
         /// For Legacy Unity Version, On Any Element Selection store the Index
         /// </summary>
         /// <param name="l"></param>
-        void onSelectCallback(ReorderableList l) {
+        void onSelectCallback(ReorderableList l)
+        {
 #if DEBUG
             Debug.Log("Legacy Select Call");
 #endif
@@ -786,7 +914,8 @@ namespace SceneListToolLibrary {
         /// For Legacy Unity Version, Update Reordered List
         /// </summary>
         /// <param name="l"></param>
-        void onReorderCallback(ReorderableList l) {
+        void onReorderCallback(ReorderableList l)
+        {
 #if DEBUG
             Debug.Log("Legacy Reorder Call");
             Debug.Log("Last Index : " + lastSelectedIndex + " - New Index : " + l.index);
@@ -799,7 +928,8 @@ namespace SceneListToolLibrary {
         /// Callback when the ReorderList has been Reordered
         /// </summary>
         /// <param name="l"></param>
-        void onReorderCallbackWithDetails(ReorderableList l, int oldIndex, int newIndex) {
+        void onReorderCallbackWithDetails(ReorderableList l, int oldIndex, int newIndex)
+        {
 #if DEBUG
             Debug.Log("onReorderCallbackWithDetails");
 #endif
@@ -823,9 +953,11 @@ namespace SceneListToolLibrary {
         /// <summary>
         /// Callback when the Scene List from the EditorBuildSettings has been updated. Add/Change/Delete
         /// </summary>
-        private void SceneListChangeCallback() {
+        private void SceneListChangeCallback()
+        {
             //If ListChanged, This callback is ignored
-            if (ReorderableListChanged) {
+            if (ReorderableListChanged)
+            {
                 ReorderableListChanged = false;
                 return;
             }
@@ -838,7 +970,8 @@ namespace SceneListToolLibrary {
             SavedData.BuildScenes_Enabled.Clear();
 
             //Load Updated Build Scenes into List
-            for (int i = 0; i < EditorBuildSettings.scenes.Length; i++) {
+            for (int i = 0; i < EditorBuildSettings.scenes.Length; i++)
+            {
                 SavedData.BuildScenes.Add(AssetDatabase.LoadAssetAtPath<SceneAsset>(EditorBuildSettings.scenes[i].path));
                 SavedData.BuildScenes_Enabled.Add(EditorBuildSettings.scenes[i].enabled);
             }
@@ -850,11 +983,13 @@ namespace SceneListToolLibrary {
         /// <summary>
         /// Updates the Build Settings Based on the Current List of Selected Scenes on the Editor
         /// </summary>
-        public void SetEditorBuildSettingsScenes() {
+        public void SetEditorBuildSettingsScenes()
+        {
             // Find valid Scene paths and make a list of EditorBuildSettingsScene
             List<EditorBuildSettingsScene> editorBuildSettingsScenes = new List<EditorBuildSettingsScene>();
 
-            for (int i = 0; i < SavedData.BuildScenes.Count; i++) {
+            for (int i = 0; i < SavedData.BuildScenes.Count; i++)
+            {
                 string scenePath = AssetDatabase.GetAssetPath(SavedData.BuildScenes[i]);
                 //Null Scenes are avoided
                 if (!string.IsNullOrEmpty(scenePath))
@@ -871,7 +1006,8 @@ namespace SceneListToolLibrary {
         /// </summary>
         /// <param name="i">Holds the index in the List</param>
         /// <param name="bg_center">The Center from the background for that element</param>
-        private void DrawSceneActionButtons(int i, float bg_center) {
+        private void DrawSceneActionButtons(int i, float bg_center)
+        {
             //NOTE: In order to Change the buttons, Check the ButtonGroupGUIContent Region. OnEnable the icons are loaded
 
             #region ALL_BUTTONS
@@ -888,9 +1024,11 @@ namespace SceneListToolLibrary {
                 EditorGUILayout.BeginHorizontal();
                 {
                     //Open Button
-                    if (GUILayout.Button(Open, GUILayout.Width(51f), GUILayout.Height(18))) {
+                    if (GUILayout.Button(Open, GUILayout.Width(51f), GUILayout.Height(18)))
+                    {
                         //Save Diaglos box shown for Dirty Scene
-                        if (EditorSceneManager.GetActiveScene().isDirty) {
+                        if (EditorSceneManager.GetActiveScene().isDirty)
+                        {
                             EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo();
                         }
 
@@ -899,7 +1037,8 @@ namespace SceneListToolLibrary {
                     }
 
                     //Locate Button
-                    if (GUILayout.Button(Locate, GUILayout.Width(51f), GUILayout.Height(18))) {
+                    if (GUILayout.Button(Locate, GUILayout.Width(51f), GUILayout.Height(18)))
+                    {
                         //Project Browser Window Showed if not Shown
                         GetWindow(System.Type.GetType("UnityEditor.ProjectBrowser,UnityEditor"));
                         Selection.activeObject = AssetDatabase.LoadMainAssetAtPath(scenePaths[i].text);
@@ -916,9 +1055,11 @@ namespace SceneListToolLibrary {
                 EditorGUILayout.BeginHorizontal();
                 {
                     //Add button
-                    if (GUILayout.Button(Add, GUILayout.Width(51f), GUILayout.Height(18))) {
+                    if (GUILayout.Button(Add, GUILayout.Width(51f), GUILayout.Height(18)))
+                    {
                         //Save Diaglos box shown for Dirty Scene
-                        if (EditorSceneManager.GetActiveScene().isDirty) {
+                        if (EditorSceneManager.GetActiveScene().isDirty)
+                        {
                             EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo();
                         }
 
@@ -926,8 +1067,10 @@ namespace SceneListToolLibrary {
                     }
 
                     //Delete Button
-                    if (GUILayout.Button(Delete, GUILayout.Width(51f), GUILayout.Height(18))) {
-                        if (EditorUtility.DisplayDialog("Delete Selected Scene?", scenePaths[i].text + "\nAre you sure you want to delete the scene? \nYou can't Undo this action", "Yes", "No")) {
+                    if (GUILayout.Button(Delete, GUILayout.Width(51f), GUILayout.Height(18)))
+                    {
+                        if (EditorUtility.DisplayDialog("Delete Selected Scene?", scenePaths[i].text + "\nAre you sure you want to delete the scene? \nYou can't Undo this action", "Yes", "No"))
+                        {
                             AssetDatabase.DeleteAsset(scenePaths[i].text);
 
                             //UpdateDatabase
@@ -940,12 +1083,14 @@ namespace SceneListToolLibrary {
                 #endregion
 
                 //Creates the AddToBuild Button
-                if (GUILayout.Button(AddToBuild, GUILayout.Width(105.5f), GUILayout.Height(18))) {
+                if (GUILayout.Button(AddToBuild, GUILayout.Width(105.5f), GUILayout.Height(18)))
+                {
                     //Creates Scene Asset from path
                     SceneAsset _scene = AssetDatabase.LoadAssetAtPath<SceneAsset>(scenePaths[i].text);
 
                     //If Scene is not added into Build List, It will be added
-                    if (!SavedData.BuildScenes.Contains(_scene)) {
+                    if (!SavedData.BuildScenes.Contains(_scene))
+                    {
                         //Scene Added to List
                         SavedData.BuildScenes.Add(_scene);
                         SavedData.BuildScenes_Enabled.Add(true);
@@ -967,7 +1112,8 @@ namespace SceneListToolLibrary {
         /// Searches the Project File for Scene. Adds them into the Array by breaking down Name and Path
         /// Initializes other arrays based on the Available Scene Count
         /// </summary>
-        private void RefreshList() {
+        private void RefreshList()
+        {
             //Searches for Scene Assets all over the project
             string[] _searchedPaths = Directory.GetFiles(projectPath, "*.unity", SearchOption.AllDirectories);
             int _sceneCount = _searchedPaths.Length;
@@ -979,7 +1125,8 @@ namespace SceneListToolLibrary {
             starToggles = new bool[_sceneCount];
 
             //Iterates through all the scenes found from the Project
-            for (int i = 0; i < _sceneCount; i++) {
+            for (int i = 0; i < _sceneCount; i++)
+            {
                 //The Scene Path Starting from Assets Folder is retrieved
                 string _relativePath = _searchedPaths[i].Substring(Application.dataPath.Length - 6);
                 //Scene Path Stored
@@ -989,7 +1136,8 @@ namespace SceneListToolLibrary {
 
                 //If Current Scene Path is Saved into Scriptable Object, The Bool is Set to True
                 //It will keep switch on of Star Toggle for that Scene
-                if (SavedData.FavoriteScenes.Contains(_relativePath)) {
+                if (SavedData.FavoriteScenes.Contains(_relativePath))
+                {
                     starToggles[i] = true;
                 }
             }
@@ -997,42 +1145,70 @@ namespace SceneListToolLibrary {
 
         /// <summary>
         /// Draws the Search Bar Whenever Called. Stores the Search Input into var searchString
+        /// Due to a Bug from 2019.3.x, Search Bar style is not properly showing. That's why Version check is inserted
         /// </summary>
         private void DrawSearchBar(ref string SearchString)
         {
-            GUILayout.Space(3f);
-            //Begins a horizontalScope
-            EditorGUILayout.BeginHorizontal();
-            //To keep proper Alignment, it is slightly moved to right
-            GUILayout.Space(5f);
-            //Search String is Stored
-            SearchString = EditorGUILayout.TextField(SearchString, SearchBarSkin);
-
-            //If there's any input in the SearchBar, Search Cancel button will be drawn
-            if (SearchString.Length > 0)
+            //IS_2019_3_OR_NEWER will be true only for any version with 2019.3.x
+            //For this version, Drawing is done manually
+            if (IS_2019_3_OR_NEWER)
             {
-                //For Proper Placement of the Cancel Button
-                //GUILayout.Space(-18f);
+                //Spacing After Refresh Button or Toolbar Design
+                GUILayout.Space(3f);
+                //Begins a horizontalScope
+                EditorGUILayout.BeginHorizontal();
+                //To keep proper Alignment, it is slightly moved to right
+                GUILayout.Space(4f);
+                //Search String is Stored
+                SearchString = EditorGUILayout.TextField(SearchString, SearchBarSkin);
 
-                //The Cancel Button is Drawn
-                if(GUILayout.Button("",CancelButtonSkin)){
-                    //String is Cleared
-                    SearchString = "";
-                    //Remove focus if cleared
-                    GUI.FocusControl(null);
+                //If there's any input in the SearchBar, Search Cancel button will be drawn
+                if (SearchString.Length > 0)
+                {
+                    //The Cancel Button is Drawn
+                    if (GUILayout.Button("", CancelButtonSkin))
+                    {
+                        //String is Cleared
+                        SearchString = "";
+                        //Remove focus if cleared
+                        GUI.FocusControl(null);
+                    }
                 }
+
+                GUILayout.Space(1f);
+                EditorGUILayout.EndHorizontal();
+
+                //Spacing for the Scene ScrollView List
+                GUILayout.Space(3f);
             }
-            else
+            else //IF versions is 2019.2.x or LESS
             {
-                GUILayout.Space(2f);
+                //Spacing After Refresh Button or Toolbar Design
+                GUILayout.Space(3f);
+
+                //Begins a horizontalScope
+                EditorGUILayout.BeginHorizontal();
+                //To keep proper Alignment, it is slightly moved to right
+                GUILayout.Space(5f);
+
+                //Search String is Stored
+                SearchString = searchField.OnToolbarGUI(SearchString, GUILayout.ExpandWidth(true), GUILayout.Height(10f));
+
+                //To keep proper Alignment, it is slightly moved to right
+                GUILayout.Space(5f);
+
+                EditorGUILayout.EndHorizontal();
+
+                //Spacing for the Scene ScrollView List
+                GUILayout.Space(10f);
             }
-            EditorGUILayout.EndHorizontal();
         }
         #endregion
 
         #region INITIALIZATION
         //The Background for Each Scene List Element
-        private void InitScrollElementBackground() {
+        private void InitScrollElementBackground()
+        {
 #if DEBUG
             Debug.Log("Init BG Color");
 #endif
@@ -1048,7 +1224,8 @@ namespace SceneListToolLibrary {
 
             //Pixels are Set as per the Color inside the Array
             Color[] ColorBlock = ScrollElementBGTexture.GetPixels();
-            for (int i = 0; i < ColorBlock.Length; i++) {
+            for (int i = 0; i < ColorBlock.Length; i++)
+            {
                 ColorBlock[i] = editorSkinColor;
             }
 
@@ -1065,17 +1242,21 @@ namespace SceneListToolLibrary {
         }
 
         //The Star Toggle Icon for "All Scenes" Tab
-        private void InitStarToggleIcon() {
+        private void InitStarToggleIcon()
+        {
             starStyle = new GUIStyle();
 
             //Inactive Star Icon
             //Checks If ProSkin
             //Adjusts the color of Tool based on the Editor Skin
-            if (isProSkin) {
+            if (isProSkin)
+            {
                 starStyle.normal.background = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SceneListTool/Textures/star_inactive_pro.png");
                 starStyle.hover.background = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SceneListTool/Textures/star_inactive_pro.png");
                 starStyle.active.background = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SceneListTool/Textures/star_inactive_pro.png");
-            } else {
+            }
+            else
+            {
                 starStyle.normal.background = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SceneListTool/Textures/star_inactive.png");
                 starStyle.hover.background = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SceneListTool/Textures/star_inactive.png");
                 starStyle.active.background = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SceneListTool/Textures/star_inactive.png");
@@ -1088,7 +1269,8 @@ namespace SceneListToolLibrary {
         }
 
         //The Scene Name Font Style is Initialized
-        private void InitSceneNameStyle() {
+        private void InitSceneNameStyle()
+        {
             if (EditorStyles.boldLabel == null)
                 sceneNameStyle = new GUIStyle("Label");
             else
@@ -1101,7 +1283,8 @@ namespace SceneListToolLibrary {
         }
 
         //The Scene Path Font Style is Initialized
-        private void InitScenePathStyle() {
+        private void InitScenePathStyle()
+        {
             if (EditorStyles.miniLabel == null)
                 scenePathStyle = new GUIStyle("Label");
             else
@@ -1116,9 +1299,11 @@ namespace SceneListToolLibrary {
 
         #region DESIGNTEMPLATE
         //A Signature Template Design, for Jisan Haider Joy
-        private void DrawTemplate() {
+        private void DrawTemplate()
+        {
             //Background Color
-            if (!isProSkin) {
+            if (!isProSkin)
+            {
                 EditorGUI.DrawRect(TemplateBackgroundRect, editorSkinBGColor);
             }
 
@@ -1131,7 +1316,8 @@ namespace SceneListToolLibrary {
             GUI.Label(ToolTitleNameRect, toolTitle, ToolNameStyle);
 
             //Help Button on Top
-            if (GUI.Button(HelpRect, helpTitle, HelpButtonStyle)) {
+            if (GUI.Button(HelpRect, helpTitle, HelpButtonStyle))
+            {
                 topToolbarSelection = 3;
             }
             #endregion
@@ -1143,16 +1329,17 @@ namespace SceneListToolLibrary {
             GUI.Label(VersionRect, version);
             #endregion
 
-            #region ColorSettings
+            //#region ColorSettings
             //editorSkinColor = EditorGUI.ColorField(new Rect(170f, windowPosition.height - 22.25f, 60f, 15f), editorSkinColor);
             //editorSkinBGColor = EditorGUI.ColorField(new Rect(240f, windowPosition.height - 22.25f, 60f, 15f), editorSkinBGColor);
-            #endregion
+            //#endregion
         }
 
         /// <summary>
         /// Initializes the Variables Required To Draw The Template Design
         /// </summary>
-        private void TemplateInit() {
+        private void TemplateInit()
+        {
             //Main Background Rect
             TemplateBackgroundRect = new Rect(0, 0, windowPosition.width, windowPosition.height);
 
@@ -1161,12 +1348,15 @@ namespace SceneListToolLibrary {
             //Title Name Rect
             ToolTitleNameRect = new Rect((windowPosition.width / 2f) - 161.5f, (40 / 2f - 10f), 323f, 20f);
 
-            if (IS_2019_OR_NEWER) {
+            if (IS_2019_OR_NEWER)
+            {
                 //Load Title Scene Asset Icon based on Pro/Personal Skin
                 toolTitle.image = (Texture)EditorGUIUtility.Load(isProSkin ? "d_SceneAsset Icon" : "SceneAsset Icon");
                 //Help Button Icon based on Pro/Personal Skin
                 helpTitle.image = (Texture)EditorGUIUtility.Load(isProSkin ? "d__Help@2x" : "_Help@2x");
-            } else {
+            }
+            else
+            {
                 //Load Title Scene Asset Icon based on Pro/Personal Skin
                 toolTitle.image = (Texture)EditorGUIUtility.Load("SceneAsset Icon");
                 //Help Button Icon based on Pro/Personal Skin
@@ -1187,7 +1377,8 @@ namespace SceneListToolLibrary {
         /// <summary>
         /// Initialize ToolName Label Style
         /// </summary>
-        private void InitToolNameStyle() {
+        private void InitToolNameStyle()
+        {
             if (EditorStyles.label == null)
                 ToolNameStyle = new GUIStyle("Label");
             else
@@ -1204,7 +1395,8 @@ namespace SceneListToolLibrary {
         /// <summary>
         /// Updates Template Size based on Window Size
         /// </summary>
-        private void TemplateSizeUpdate() {
+        private void TemplateSizeUpdate()
+        {
             TemplateBackgroundRect.width = windowPosition.width;
             TemplateBackgroundRect.height = windowPosition.height;
 

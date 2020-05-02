@@ -19,6 +19,8 @@ MonoBehaviour:
   - Assets/Scenes/SampleScene 5.unity
   - Assets/Scenes/SampleScene.unity
   - Assets/Some Assets/Demos/Isometric Scene/IsoCasualGame.unity
+  - Assets/Scenes/SampleScene 3.unity
+  - Assets/TextMesh Pro/Examples & Extras/Scenes/02 - Multi-line TextMesh Pro.unity
   BuildScenes:
   - {fileID: 102900000, guid: 00c928bfb78bad34fadd6f293313da35, type: 3}
   - {fileID: 102900000, guid: 9fc0d4010bbf28b4594072e72b8655ab, type: 3}
