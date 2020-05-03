@@ -1,4 +1,4 @@
-Scene List Tool - v1.0.0
+Scene List Tool - v1.1.0
 
 The Tool is guranteed to work on Editor Version 2017 or ABOVE
 
