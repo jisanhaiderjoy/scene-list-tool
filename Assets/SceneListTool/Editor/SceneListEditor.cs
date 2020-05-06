@@ -60,6 +60,10 @@ namespace SceneListToolLibrary
         private Vector2 scrollPos;
         #endregion
 
+        #region STARRED_VARIABLES
+        private Texture2D UnstarIcon;
+        #endregion
+
         #region SEARCH
         //SearchField for v2019.2.x or Less
         UnityEditor.IMGUI.Controls.SearchField searchField;
@@ -227,6 +231,9 @@ namespace SceneListToolLibrary
 
             //Load Button Asset Icon based on Pro/Personal Skin
             AddToBuild.image = (Texture)EditorGUIUtility.Load(isProSkin ? "d_UnityEditor.SceneHierarchyWindow" : "UnityEditor.SceneHierarchyWindow");
+
+            //The icon for Starred Tab, to unstar a Scene. Loaded based on the Pro/Personal Skin
+            UnstarIcon = AssetDatabase.LoadAssetAtPath<Texture2D>(isProSkin ? "Assets/SceneListTool/Textures/unstar_pro.png" : "Assets/SceneListTool/Textures/unstar.png");
 
             //Gets the Project Path
             projectPath = Application.dataPath;
@@ -563,36 +570,69 @@ namespace SceneListToolLibrary
                     if (!sceneNames[i].text.ToLower().Contains(StarredSearchString.ToLower()))
                         continue;
 
-                    //The main Horizontal Area of Each Elements.
+                    //The main Horizontal Area of Each Elements. It's Rect Component is stored to calculate the Center.
+                    //Helps for making the Editor Responsive
                     EditorGUILayout.BeginHorizontal(ScrollElementBackground, GUILayout.MinHeight(70f));
                     {
-                        //Creates a small space before drawing the Text Labels
-                        GUILayout.Space(3);
-
-                        //Text Design
-                        #region TEXT_LABELS_DESIGN
                         //The Width of the Text is defined as per the Window Width
-                        float _TextWidth = windowPosition.width - 146f;
+                        float _TextWidth = windowPosition.width - 180f;
 
-                        //Vertical Area Created To Draw Two Labels on top of each other
                         EditorGUILayout.BeginVertical();
-
-                        float _b4 = sceneNameStyle.CalcHeight(sceneNames[i], _TextWidth);
-                        float _b5 = scenePathStyle.CalcHeight(scenePaths[i], _TextWidth);
+                        var _b4 = sceneNameStyle.CalcHeight(sceneNames[i], _TextWidth);
+                        var _b5 = scenePathStyle.CalcHeight(scenePaths[i], _TextWidth);
 
                         float h2 = _b4 + _b5;
+                        EditorGUILayout.EndVertical();
+
                         //Center windowPosition for each element
                         float _horizontalCenter = 60f > h2 ? (30f) : (h2 / 2f);
 
-                        //Spacing added to keep the Text Labels at Center of Background
-                        GUILayout.Space(_horizontalCenter - h2 / 2f);
+                        //Creates a small space before drawing the StarToggle
+                        GUILayout.Space(3);
+                        //Toggle Design
+                        #region UNSTAR_BUTTON_DESIGN
+                        //Creates Vertical Area to Draw Label
+                        EditorGUILayout.BeginVertical();
+                        {
+                            //Spacing added to Keep the Toggle at Center
+                            GUILayout.Space(_horizontalCenter - 12.5f);
 
-                        //Scene Name Label
-                        EditorGUILayout.LabelField(sceneNames[i], sceneNameStyle, GUILayout.Width(_TextWidth));
+                            //Button to remove scene from Starred
+                            if (GUILayout.Button(UnstarIcon,GUILayout.Height(22f), GUILayout.Width(22f)))
+                            {
+#if DEBUG
+                                Debug.Log(scenePaths[i].text + " Removed");
+#endif
+                                //Toggle Removed
+                                starToggles[i] = false;
 
-                        //Scene Path Label
-                        EditorGUILayout.LabelField(scenePaths[i], scenePathStyle, GUILayout.Width(_TextWidth));
+                                //Scene Path Removed from Data
+                                SavedData.FavoriteScenes.Remove(scenePaths[i].text);
 
+                                //Scriptable Object Set Dirty and Saved
+                                EditorUtility.SetDirty(SavedData);
+                                AssetDatabase.SaveAssets();
+                            }
+                        }
+                        EditorGUILayout.EndVertical();
+                        #endregion
+
+                        //Creates a small space before drawing the Text Labels
+                        GUILayout.Space(3);
+                        //Text Design
+                        #region TEXT_LABELS_DESIGN
+                        //Vertical Area Created To Draw Two Labels on top of each other
+                        EditorGUILayout.BeginVertical();
+                        {
+                            //Spacing added to keep the Text Labels at Center of Background
+                            GUILayout.Space(_horizontalCenter - h2 / 2f);
+
+                            //Scene Name Label
+                            EditorGUILayout.LabelField(sceneNames[i], sceneNameStyle, GUILayout.Width(_TextWidth));
+
+                            //Scene Path Label
+                            EditorGUILayout.LabelField(scenePaths[i], scenePathStyle, GUILayout.Width(_TextWidth));
+                        }
                         EditorGUILayout.EndVertical();
                         #endregion
 
