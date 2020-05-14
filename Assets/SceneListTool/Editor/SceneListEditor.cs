@@ -5,6 +5,7 @@ using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEditorInternal;
 using System.Reflection;
+using UnityEditor.VersionControl;
 
 namespace SceneListToolLibrary
 {
@@ -79,6 +80,9 @@ namespace SceneListToolLibrary
         private Rect windowPosition;
 
         private string projectPath;
+        
+        //The Relative Path of the Tool
+        private string toolPath;
 
         private GUIStyle ScrollElementBackground;
         private Texture2D ScrollElementBGTexture;
@@ -122,6 +126,11 @@ namespace SceneListToolLibrary
         /// </summary>
         private void OnEnable()
         {
+            //Searches for the Script Editor Path
+            string _scriptPath = AssetDatabase.GUIDToAssetPath(AssetDatabase.FindAssets(this.GetType().Name)[0]);
+            //Gets the root path for the Tool 
+            toolPath = _scriptPath.Substring(0, _scriptPath.Length - 26);
+            
             //Gets Editor Version to Execute Version Specific Codes
 #if DEBUG
             Debug.Log(Application.unityVersion);
@@ -221,16 +230,18 @@ namespace SceneListToolLibrary
 
             //Gets the Project Path
             projectPath = Application.dataPath;
+            
+            // AssetDatabase.FindAssets()
 
             //Scriptable Data Loaded
-            if (!Directory.Exists(Application.dataPath + "/SceneListTool/Data/")) { Directory.CreateDirectory(Application.dataPath + "/SceneListTool/Data/"); }
-            SavedData = AssetDatabase.LoadAssetAtPath<SceneListData>("Assets/SceneListTool/Data/SceneListData.asset");
+            if (!AssetDatabase.IsValidFolder(toolPath + "/Data")) { AssetDatabase.CreateFolder(toolPath,"Data"); }
+            SavedData = AssetDatabase.LoadAssetAtPath<SceneListData>(toolPath + "/Data/SceneListData.asset");
 
             //If Scriptable Data is not found, a new one is created and initialized for use
             if (SavedData == null)
             {
                 SavedData = CreateInstance<SceneListData>();
-                AssetDatabase.CreateAsset(SavedData, "Assets/SceneListTool/Data/SceneListData.asset");
+                AssetDatabase.CreateAsset(SavedData, toolPath + "/Data/SceneListData.asset");
 
                 //No Starred Scene. Empty List
                 SavedData.FavoriteScenes = new List<string>();
@@ -1245,27 +1256,32 @@ namespace SceneListToolLibrary
         private void InitStarToggleIcon()
         {
             starStyle = new GUIStyle();
-
+            
             //Inactive Star Icon
             //Checks If ProSkin
             //Adjusts the color of Tool based on the Editor Skin
-            if (isProSkin)
-            {
-                starStyle.normal.background = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SceneListTool/Textures/star_inactive_pro.png");
-                starStyle.hover.background = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SceneListTool/Textures/star_inactive_pro.png");
-                starStyle.active.background = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SceneListTool/Textures/star_inactive_pro.png");
+            if (isProSkin) {
+                //Path for the Inactive Star Texture for Pro Editor
+                string _inactivePath = toolPath + "/Textures/star_inactive_pro.png";
+                starStyle.normal.background = AssetDatabase.LoadAssetAtPath<Texture2D>(_inactivePath);
+                starStyle.hover.background = AssetDatabase.LoadAssetAtPath<Texture2D>(_inactivePath);
+                starStyle.active.background = AssetDatabase.LoadAssetAtPath<Texture2D>(_inactivePath);
             }
             else
             {
-                starStyle.normal.background = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SceneListTool/Textures/star_inactive.png");
-                starStyle.hover.background = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SceneListTool/Textures/star_inactive.png");
-                starStyle.active.background = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SceneListTool/Textures/star_inactive.png");
+                //Path for the Inactive Star Texture
+                string _inactivePath = toolPath + "/Textures/star_inactive.png";
+                starStyle.normal.background = AssetDatabase.LoadAssetAtPath<Texture2D>(_inactivePath);
+                starStyle.hover.background = AssetDatabase.LoadAssetAtPath<Texture2D>(_inactivePath);
+                starStyle.active.background = AssetDatabase.LoadAssetAtPath<Texture2D>(_inactivePath);
             }
 
+            //Path for the active Star Texture
+            string _activePath = toolPath + "/Textures/star_active.png";
             //Active Star Icon
-            starStyle.onNormal.background = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SceneListTool/Textures/star_active.png");
-            starStyle.onHover.background = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SceneListTool/Textures/star_active.png");
-            starStyle.onActive.background = AssetDatabase.LoadAssetAtPath<Texture2D>("Assets/SceneListTool/Textures/star_active.png");
+            starStyle.onNormal.background = AssetDatabase.LoadAssetAtPath<Texture2D>(_activePath);
+            starStyle.onHover.background = AssetDatabase.LoadAssetAtPath<Texture2D>(_activePath);
+            starStyle.onActive.background = AssetDatabase.LoadAssetAtPath<Texture2D>(_activePath);
         }
 
         //The Scene Name Font Style is Initialized
