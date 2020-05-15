@@ -233,7 +233,7 @@ namespace SceneListToolLibrary
             AddToBuild.image = (Texture)EditorGUIUtility.Load(isProSkin ? "d_UnityEditor.SceneHierarchyWindow" : "UnityEditor.SceneHierarchyWindow");
 
             //The icon for Starred Tab, to unstar a Scene. Loaded based on the Pro/Personal Skin
-            UnstarIcon = AssetDatabase.LoadAssetAtPath<Texture2D>(isProSkin ? "Assets/SceneListTool/Textures/unstar_pro.png" : "Assets/SceneListTool/Textures/unstar.png");
+            UnstarIcon = AssetDatabase.LoadAssetAtPath<Texture2D>(isProSkin ? toolPath + "/Textures/unstar_pro.png" : toolPath + "/Textures/unstar.png");
 
             //Gets the Project Path
             projectPath = Application.dataPath;

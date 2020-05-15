@@ -17,8 +17,6 @@ MonoBehaviour:
   - Assets/Scenes/SampleScene 4.unity
   - Assets/Scenes/SampleScene.unity
   - Assets/Scenes/SampleScene2SampleScene2SampleScene2SampleScene2SampleScene2SampleScene2.unity
-  - Assets/TextMesh Pro/Examples & Extras/Scenes/02 - Multi-line TextMesh Pro.unity
-  - Assets/TextMesh Pro/Examples & Extras/Scenes/03 - Line Justification.unity
   - Assets/LaraCroftGo Dummy/LaraCroftGo.unity
   BuildScenes:
   - {fileID: 102900000, guid: 00c928bfb78bad34fadd6f293313da35, type: 3}
