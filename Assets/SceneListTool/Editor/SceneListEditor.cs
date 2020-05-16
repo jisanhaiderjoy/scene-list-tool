@@ -265,7 +265,8 @@ namespace SceneListToolLibrary {
                 : toolPath + "/Textures/unstar.png");
 
             //Adds + icon to the GUI Content
-            AddOpenedScenes.image = (Texture2D)EditorGUIUtility.Load("CreateAddNew@2x");
+            AddOpenedScenes.image =
+                (Texture2D) EditorGUIUtility.Load(isProSkin ? "d_CreateAddNew@2x" : "CreateAddNew@2x");
             
             //Gets the Project Path
             projectPath = Application.dataPath;
