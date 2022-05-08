@@ -370,36 +370,36 @@ namespace SceneListToolLibrary {
                 isEditorSkinChanged = false;
             }
 
-            if (starStyle == null)
+            if (starStyle == null || starStyle.normal == null)
                 InitStarToggleIcon();
 
-            if (ScrollElementBackground == null)
+            if (ScrollElementBackground == null || ScrollElementBackground.normal == null)
                 InitScrollElementBackground();
 
-            if (sceneNameStyle == null)
+            if (sceneNameStyle == null || string.IsNullOrEmpty(sceneNameStyle.name))
                 InitSceneNameStyle();
 
-            if (scenePathStyle == null)
+            if (scenePathStyle == null || string.IsNullOrEmpty(scenePathStyle.name))
                 InitScenePathStyle();
 
-            if (ToolNameStyle == null)
+            if (ToolNameStyle == null || string.IsNullOrEmpty(ToolNameStyle.name))
                 InitToolNameStyle();
 
-            if (HelpButtonStyle == null)
+            if (HelpButtonStyle == null || string.IsNullOrEmpty(HelpButtonStyle.name))
                 HelpButtonStyle = new GUIStyle("IconButton");
 
             //Load Cancel Button Skin
-            if (CancelButtonSkin == null) {
+            if (CancelButtonSkin == null || string.IsNullOrEmpty(CancelButtonSkin.name)) {
                 CancelButtonSkin = new GUIStyle("ToolbarSeachCancelButton");
                 //CancelButtonSkin.normal.
             }
 
             //Load Search Bar Skin
-            if (SearchBarSkin == null)
+            if (SearchBarSkin == null || string.IsNullOrEmpty(SearchBarSkin.name))
                 SearchBarSkin = new GUIStyle("ToolbarSeachTextField");
 
             //Load Search Empty Skin
-            if (SearchEmptySkin == null)
+            if (SearchEmptySkin == null || string.IsNullOrEmpty(SearchEmptySkin.name))
                 SearchEmptySkin = new GUIStyle("ToolbarSeachCancelButtonEmpty");
 
         #endregion
@@ -1242,8 +1242,23 @@ namespace SceneListToolLibrary {
         /// Adds the Current Opened Scens into the Starred Tab
         /// </summary>
         private void AddCurrentOpenedScenes() {
-            for (int i = 0; i < EditorSceneManager.sceneCount; i++) {
+            int favoriteCount = SavedData.FavoriteScenes.Count;
+            int editorSceneCount = EditorSceneManager.sceneCount; 
+            
+            for (int i = 0; i < editorSceneCount; i++) {
                 string _ScenePathAt = EditorSceneManager.GetSceneAt(i).path;
+
+                //If Opened Scene is not Saved, then it gives Empty Path
+                if (string.IsNullOrEmpty(_ScenePathAt)) {
+                    string dialogMessage = "Current Scene is not saved. Please Save and Try Again";
+                    
+                    if (editorSceneCount > 1) {
+                        dialogMessage = "One of the Scenes is not saved. Please Save and Try Again";
+                    }
+
+                    EditorUtility.DisplayDialog("Scene Not Saved", dialogMessage, "Ok");
+                    continue;
+                }
 
                 if (!SavedData.FavoriteScenes.Contains(_ScenePathAt)) {
                     //Add Current Scene at Index as Starred Scenes
@@ -1253,6 +1268,11 @@ namespace SceneListToolLibrary {
                     EditorUtility.SetDirty(SavedData);
                     AssetDatabase.SaveAssets();
                 }
+            }
+
+            //If no change in Fav Scenes Data, then return
+            if (favoriteCount == SavedData.FavoriteScenes.Count) {
+                return;
             }
 
             //Show on Starred Tab Tab
