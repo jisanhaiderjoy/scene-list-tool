@@ -123,9 +123,10 @@ namespace SceneListToolLibrary {
     #endregion
 
     #region BUTTON_GROUP_GUICONTENT
-
+    
+        GUIStyle ButtonGroupStyle;
         GUIContent Open = new GUIContent("Open", "Open Scene Single");
-        GUIContent Add = new GUIContent("Add", "Open Scene Additive");
+        GUIContent Add = new GUIContent("Additive", "Open Scene Additive");
         GUIContent Locate = new GUIContent("Locate", "Select file on the project window");
         GUIContent Delete = new GUIContent("Delete", "Delete the selected scene");
         GUIContent AddToBuild = new GUIContent("Add To Build", "Add to Build list and adjust if needed");
@@ -359,6 +360,7 @@ namespace SceneListToolLibrary {
                 InitSceneNameStyle();
                 InitScenePathStyle();
                 InitToolNameStyle();
+                InitButtonGroupStyle();
                 HelpButtonStyle = new GUIStyle("IconButton");
                 CancelButtonSkin = new GUIStyle("ToolbarSeachCancelButton");
                 SearchBarSkin = new GUIStyle("ToolbarSeachTextField");
@@ -384,7 +386,10 @@ namespace SceneListToolLibrary {
 
             if (ToolNameStyle == null || string.IsNullOrEmpty(ToolNameStyle.name))
                 InitToolNameStyle();
-
+            
+            if (ButtonGroupStyle == null || ButtonGroupStyle.name == "")
+                InitButtonGroupStyle();
+            
             if (HelpButtonStyle == null || string.IsNullOrEmpty(HelpButtonStyle.name))
                 HelpButtonStyle = new GUIStyle("IconButton");
 
@@ -1101,8 +1106,10 @@ namespace SceneListToolLibrary {
         /// Changing in this function will cause change in both
         /// </summary>
         /// <param name="i">Holds the index in the List</param>
-        /// <param name="bg_center">The Center from the background for that element</param>
-        private void DrawSceneActionButtons(int i, float bg_center) {
+        /// <param name="bgCenter">The Center from the background for that element</param>
+        private void DrawSceneActionButtons(int i, float bgCenter) {
+            float halfButtonWidth = 51f;
+            float buttonHeight = 18f;
             //NOTE: In order to Change the buttons, Check the ButtonGroupGUIContent Region. OnEnable the icons are loaded
 
         #region ALL_BUTTONS
@@ -1112,7 +1119,7 @@ namespace SceneListToolLibrary {
             {
                 //Sets the group to the Center from the Background, So that when the Background Height Increases
                 //It will always stay in the Center.
-                GUILayout.Space(bg_center - 29f);
+                GUILayout.Space(bgCenter - 29f);
 
                 //Button Group 1 - "Open Button" & "Locate Button"
 
@@ -1122,7 +1129,7 @@ namespace SceneListToolLibrary {
                 EditorGUILayout.BeginHorizontal();
                 {
                     //Open Button
-                    if (GUILayout.Button(Open, GUILayout.Width(51f), GUILayout.Height(18))) {
+                    if (GUILayout.Button(Open, ButtonGroupStyle, GUILayout.Width(halfButtonWidth), GUILayout.Height(buttonHeight))) {
                         //Save Diaglos box shown for Dirty Scene
                         if (EditorSceneManager.GetActiveScene().isDirty) {
                             EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo();
@@ -1133,7 +1140,7 @@ namespace SceneListToolLibrary {
                     }
 
                     //Locate Button
-                    if (GUILayout.Button(Locate, GUILayout.Width(51f), GUILayout.Height(18))) {
+                    if (GUILayout.Button(Locate, ButtonGroupStyle, GUILayout.Width(halfButtonWidth), GUILayout.Height(buttonHeight))) {
                         //Project Browser Window Showed if not Shown
                         GetWindow(System.Type.GetType("UnityEditor.ProjectBrowser,UnityEditor"));
                         Selection.activeObject = AssetDatabase.LoadMainAssetAtPath(scenePaths[i].text);
@@ -1154,7 +1161,7 @@ namespace SceneListToolLibrary {
                 EditorGUILayout.BeginHorizontal();
                 {
                     //Add button
-                    if (GUILayout.Button(Add, GUILayout.Width(51f), GUILayout.Height(18))) {
+                    if (GUILayout.Button(Add, ButtonGroupStyle, GUILayout.Width(halfButtonWidth), GUILayout.Height(buttonHeight))) {
                         //Save Diaglos box shown for Dirty Scene
                         if (EditorSceneManager.GetActiveScene().isDirty) {
                             EditorSceneManager.SaveCurrentModifiedScenesIfUserWantsTo();
@@ -1164,7 +1171,7 @@ namespace SceneListToolLibrary {
                     }
 
                     //Delete Button
-                    if (GUILayout.Button(Delete, GUILayout.Width(51f), GUILayout.Height(18))) {
+                    if (GUILayout.Button(Delete, ButtonGroupStyle, GUILayout.Width(halfButtonWidth), GUILayout.Height(buttonHeight))) {
                         if (EditorUtility.DisplayDialog("Delete Selected Scene?",
                             scenePaths[i].text +
                             "\nAre you sure you want to delete the scene? \nYou can't Undo this action", "Yes", "No")) {
@@ -1181,7 +1188,7 @@ namespace SceneListToolLibrary {
             #endregion
 
                 //Creates the AddToBuild Button
-                if (GUILayout.Button(AddToBuild, GUILayout.Width(105.5f), GUILayout.Height(18))) {
+                if (GUILayout.Button(AddToBuild, ButtonGroupStyle, GUILayout.Width(105.5f), GUILayout.Height(buttonHeight))) {
                     //Creates Scene Asset from path
                     SceneAsset _scene = AssetDatabase.LoadAssetAtPath<SceneAsset>(scenePaths[i].text);
 
@@ -1363,13 +1370,13 @@ namespace SceneListToolLibrary {
             ScrollElementBGTexture = new Texture2D(64, 64);
 
             //Pixels are Set as per the Color inside the Array
-            Color[] ColorBlock = ScrollElementBGTexture.GetPixels();
-            for (int i = 0; i < ColorBlock.Length; i++) {
-                ColorBlock[i] = editorSkinColor;
+            Color[] colorBlock = ScrollElementBGTexture.GetPixels();
+            for (int i = 0; i < colorBlock.Length; i++) {
+                colorBlock[i] = editorSkinColor;
             }
 
             //Pixels are Applied into Texture
-            ScrollElementBGTexture.SetPixels(ColorBlock);
+            ScrollElementBGTexture.SetPixels(colorBlock);
             ScrollElementBGTexture.Apply();
 
             //Background Texture added into the Background Style
@@ -1434,6 +1441,22 @@ namespace SceneListToolLibrary {
             scenePathStyle.fontSize = 10;
             scenePathStyle.fontStyle = FontStyle.Normal;
             scenePathStyle.wordWrap = true;
+        }
+        
+        /// <summary>
+        /// Initializes the Action Button Group Style for each Scenes. Needed for maintaining the font size and padding 
+        /// </summary>
+        private void InitButtonGroupStyle() {
+            if (EditorStyles.miniButtonLeft == null)
+                ButtonGroupStyle = new GUIStyle("Button");
+            else
+                ButtonGroupStyle = new GUIStyle(EditorStyles.miniButtonLeft);
+
+            ButtonGroupStyle = new GUIStyle(EditorStyles.miniButtonLeft);
+            ButtonGroupStyle.fontSize = 11;
+            RectOffset padding = ButtonGroupStyle.padding;
+            padding.left += 2;
+            ButtonGroupStyle.padding = padding;
         }
 
     #endregion
